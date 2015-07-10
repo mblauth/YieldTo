@@ -2,12 +2,17 @@ cmake_minimum_required(VERSION 3.2)
 project(YieldTo C)
 
 if(PIKEOS)
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DPIKEOS_POSIX_PSE52 -DPIKEOS_POSIX_SCHEDULER_HOOK=true")
 set(CMAKE_FIND_ROOT_PATH /opt/pikeos-3.5)
+set(POSIXLIBS ${CMAKE_FIND_ROOT_PATH}/target/ppc/e500/bposix/lib/)
 set(CMAKE_C_COMPILER ${CMAKE_FIND_ROOT_PATH}/cdk/ppc/e500/bin/ppc_e500-gcc)
 set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
 set(CMAKE_FIND_ROOT_PATH_NIDE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
-include_directories(SYSTEM ${CMAKE_FIND_ROOT_PATH}/target/ppc/e500/bposix/include )
+include_directories(SYSTEM ${CMAKE_FIND_ROOT_PATH}/target/ppc/e500/bposix/include)
+link_directories(SYSTEM ${CMAKE_FIND_ROOT_PATH}/target/ppc/e500/lib
+                 SYSTEM ${CMAKE_FIND_ROOT_PATH}/target/ppc/e500/bposix/os/up)
+
 endif()
 
 
@@ -19,8 +24,15 @@ find_package(Threads REQUIRED)
 
 add_executable(YieldTo yieldTo.c)
 
-target_link_libraries(YieldTo ${CMAKE_THREAD_LIBS_INIT})
-
+if(PIKEOS)
+  set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -T${CMAKE_FIND_ROOT_PATH}/target/ppc/e500/scripts/app-ld-script ${CMAKE_FIND_ROOT_PATH}/target/ppc/e500/bposix/os/up/crt0.o ${POSIXLIBS}/pse52.o ${POSIXLIBS}/pse52_ext2fs.o ${POSIXLIBS}/pse52_ufs.o ${POSIXLIBS}/rootfs.a")
+  target_link_libraries(YieldTo c sbuf m vm p4 gcc stand)
+  if(PIKEOS_TARGET)
+    install(PROGRAMS ${CMAKE_BINARY_DIR}/YieldTo DESTINATION ${PIKEOS_TARGET} RENAME posix)
+  endif()
+else()
+  target_link_libraries(YieldTo ${CMAKE_THREAD_LIBS_INIT})
+endif()
 find_program(SCP_EXECUTABLE scp)
 if(WANT_SCP)
   if(SCP_EXECUTABLE)
