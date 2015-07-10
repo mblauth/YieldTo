@@ -53,11 +53,8 @@ static void createBackgroundThreads();
 static void joinBackgroundThreads();
 static void singleCoreOnly();
 static void *toLogic(void *);
-static void setPolicy();
-
+static void setRealtimeParameters(pthread_t thread);
 static void marker();
-
-void marker();
 
 #if Yield_Policy == POSIX_yield
 static inline long yieldTo(long const ignored) { // not a yieldTo(), just here for testing
@@ -77,23 +74,26 @@ static inline long yieldTo(long const id) {
 
 #elif Yield_Policy == PikeOS_hook
 // works via a preemption-notification, not a direct yieldTo
-
 static volatile bool preempted = false;
 
-static bool preempt_hook(unsigned cpu, pthread_t t_old, pthread_t t_new) {
+static int preempt_hook(unsigned cpu, pthread_t t_old, pthread_t t_new) {
     UNUSED(cpu); UNUSED(t_old); UNUSED(t_new);
-    printf("preempted\n");
     if (yieldedTo) return false;
     preempted = true;
     return true;
 }
 
-static inline long yieldTo(long const to) { // ToDo: boost other thread
-    if(preempted) {
+static inline long yieldTo(pthread_t const to) {
+    printf("boosting\n");
+    struct sched_param param = { .sched_priority = Realtime_Priority + 1 };
+    if (pthread_setschedparam(to, Scheduling_Policy, &param) != 0) {
+        printf("boosting failed\n");
+        exit(7);
+    }
+    if (preempted) {
         preempted = false;
+        printf("re-allowing preemption\n");
         __revert_sched_boost(pthread_self());
-    } else {
-        sched_yield();
     }
     return 0;
 }
@@ -105,21 +105,24 @@ static inline long yieldTo(long const to) { // ToDo: boost other thread
 
 void main(int argc, char *argv[]) {
     singleCoreOnly();
-    setPolicy();
+    setRealtimeParameters(pthread_self());
 #if HaveBarriers
     pthread_barrier_init(&barrier, NULL, 2);
 #endif
     pthread_create(&to, NULL, &toLogic, NULL);
     createBackgroundThreads();
 #if Yield_Policy == PikeOS_hook
-    int const hookResult = __set_sched_hook(SCHED_PREEMPT_HOOK, preempt_hook);
-    printf("hook setup result: %d\n", hookResult);
+    if (__set_sched_hook(SCHED_PREEMPT_HOOK, preempt_hook) == (__sched_hook_t * ) - 1) {
+        printf("failed to register preemption hook\n");
+        exit(6);
+    }
+    printf("registered preemption hook\n");
     #endif
 #if HaveBarriers
     pthread_barrier_wait(&barrier);
 #else
     while(!toInitialized) sched_yield();
-    #endif
+#endif
     marker();
     while (!toFinished) {
         for (unsigned long k = 0; k < 0xffffff; k++) yieldedTo = false;
@@ -160,8 +163,17 @@ static void *toLogic(void *ignored) {
             if (yieldedTo) {
                 printf("yieldTo worked!\n");
                 yieldedTo = false;
+                #ifdef __PikeOS__
+                printf("deboosting\n");
+                struct sched_param param = { .sched_priority = Realtime_Priority };
+                if (pthread_setschedparam(to, Scheduling_Policy, &param) != 0) {
+                    printf("deboosting failed\n");
+                    exit(8);
+                }
+                #endif
             }
         }
+    printf("yieldTo target finished execution\n");
     toFinished = true;
     return NULL;
 }
@@ -206,14 +218,6 @@ static void joinBackgroundThreads() {
 
 static void createBackgroundThreads() {
     printf("creating %i background threads...", Background_Thread_Number);
-    for (int i = 0; i < Background_Thread_Number; i++)
-        pthread_create(&tid[i], NULL, &busy, NULL);
-    printf("done\n");
-}
-
-static void setPolicy() {
-#if Scheduling_Policy == SCHED_FIFO || Scheduling_Policy == SCHED_RR
-    printf("setting realtime policy\n");
     pthread_attr_t attr;
     if (pthread_attr_init(&attr) != 0) {
         printf("thread attr init failure");
@@ -223,10 +227,23 @@ static void setPolicy() {
         printf("could not set realtime policy\n");
         exit(4);
     }
-    struct sched_param param;
-    param.sched_priority = Realtime_Priority;
+    struct sched_param param = { .sched_priority = Realtime_Priority };
     if (pthread_attr_setschedparam(&attr, &param)) {
-        printf("could not set priority\n");
+        printf("could not set realtime priority\n");
+        exit(4);
+    }
+    for (int i = 0; i < Background_Thread_Number; i++)
+        pthread_create(&tid[i], &attr, &busy, NULL);
+    pthread_attr_destroy(&attr);
+    printf("done\n");
+}
+
+static void setRealtimeParameters(pthread_t thread) {
+#if Scheduling_Policy == SCHED_FIFO || Scheduling_Policy == SCHED_RR
+    printf("setting realtime parameters\n");
+    struct sched_param param = { .sched_priority = Realtime_Priority };
+    if (pthread_setschedparam(thread, Scheduling_Policy, &param)) {
+        printf("could not set realtime parameters\n");
         exit(5);
     }
 #endif
