@@ -252,7 +252,7 @@ static void setRealtimeParameters(pthread_t thread) {
         printf("could not set realtime parameters\n");
         exit(5);
     }
-    #ifdef __linux__
+    #ifdef _POSIX_PRIORITY_SCHEDULING
     #if Scheduling_Policy == SCHED_RR
     struct timespec interval;
     sched_rr_get_interval(0, &interval);
