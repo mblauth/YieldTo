@@ -8,6 +8,7 @@
 #ifdef __linux__
 
 #include <sys/syscall.h>
+#include <ruby/missing.h>
 
 #define HaveBarriers 1
 #endif
@@ -21,7 +22,7 @@
 #define PikeOS_hook 2
 
 #define Yield_Policy Linux_yieldTo
-#define Scheduling_Policy SCHED_OTHER
+#define Scheduling_Policy SCHED_RR
 #define Realtime_Priority 75
 #define Background_Thread_Number 20
 #define Load_Factor 5
@@ -251,5 +252,12 @@ static void setRealtimeParameters(pthread_t thread) {
         printf("could not set realtime parameters\n");
         exit(5);
     }
+    #ifdef __linux__
+    #if Scheduling_Policy == SCHED_RR
+    struct timespec interval;
+    sched_rr_get_interval(0, &interval);
+    printf("RR interval: %ld s %ld ns\n", interval.tv_sec, interval.tv_nsec);
+    #endif
+    #endif
 #endif
 }
