@@ -21,7 +21,7 @@
 #define PikeOS_hook 2
 
 #define Yield_Policy Linux_yieldTo
-#define Scheduling_Policy SCHED_RR
+#define Scheduling_Policy SCHED_OTHER
 #define Realtime_Priority 75
 #define Background_Thread_Number 20
 #define Load_Factor 5
@@ -218,6 +218,7 @@ static void joinBackgroundThreads() {
 
 static void createBackgroundThreads() {
     printf("creating %i background threads...", Background_Thread_Number);
+#if Scheduling_Policy == SCHED_FIFO || Scheduling_Policy == SCHED_RR
     pthread_attr_t attr;
     if (pthread_attr_init(&attr) != 0) {
         printf("thread attr init failure");
@@ -235,6 +236,10 @@ static void createBackgroundThreads() {
     for (int i = 0; i < Background_Thread_Number; i++)
         pthread_create(&tid[i], &attr, &busy, NULL);
     pthread_attr_destroy(&attr);
+#else
+    for (int i = 0; i < Background_Thread_Number; i++)
+        pthread_create(&tid[i], NULL, &busy, NULL);
+#endif
     printf("done\n");
 }
 
