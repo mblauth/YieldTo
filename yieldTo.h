@@ -6,8 +6,10 @@
 void deboost();
 void marker();
 void registerPreemptionHook();
+void setFromId();
 void setToId();
 void singleCoreOnly();
-long yieldTo();
+void yieldBack();
+void yieldTo();
 
 #endif //YIELDTO_H

@@ -16,6 +16,7 @@
 #endif
 
 static volatile long toId;
+static volatile long fromId;
 
 inline void marker() {
   syscall(SYS_gettid);
@@ -24,6 +25,10 @@ inline void marker() {
 // not needed on Linux
 void deboost() {}
 void registerPreemptionHook() {}
+
+inline void setFromId() {
+  fromId = syscall(SYS_gettid);
+}
 
 inline void setToId() {
   toId = syscall(SYS_gettid);
@@ -41,10 +46,18 @@ void singleCoreOnly() {
   }
 }
 
-inline long yieldTo() {
-  if (!toId) {
+static inline long yield(long id) {
+  if (!id) {
     perror("could not find thread\n");
     exit(2);
   }
-  return syscall(__NR_sched_yieldTo, toId);
+  return syscall(__NR_sched_yieldTo, id);
+}
+
+inline void yieldTo() {
+  yield(toId);
+}
+
+inline void yieldBack() {
+  yield(fromId);
 }

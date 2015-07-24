@@ -6,6 +6,7 @@
 void deboost(){}
 void marker(){}
 void registerPreemptionHook() {}
+void setFromId(){}
 void setToId(){}
 
 #ifdef __linux
@@ -27,7 +28,10 @@ void setToId(){}
 #endif
 
 
-long yieldTo() { // not a yieldTo(), just here for testing
+void yieldTo() { // not a yieldTo(), just here for testing
   sched_yield();
-  return 0;
+}
+
+void yieldBack() { // not a yieldTo(), just here for testing
+  sched_yield();
 }

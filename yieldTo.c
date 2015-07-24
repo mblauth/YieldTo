@@ -9,12 +9,14 @@
 #define Scheduling_Policy SCHED_RR
 #define Realtime_Priority 75
 #define Background_Thread_Number 20
-#define Load_Factor 5
+#define Load_Factor 10
+#define YieldBack true
 
 static pthread_t tid[Background_Thread_Number];
 static pthread_t to;
 
 static volatile bool yieldedTo = false;
+static volatile bool yieldedBack = false;
 static volatile bool toFinished = false;
 
 static void createBackgroundThreads();
@@ -25,6 +27,7 @@ static void setRealtimeParameters(pthread_t thread);
 void main(int argc, char *argv[]) {
     singleCoreOnly();
     setRealtimeParameters(pthread_self());
+    setFromId();
     initBarrier();
     pthread_create(&to, NULL, &toLogic, NULL);
     createBackgroundThreads();
@@ -32,12 +35,18 @@ void main(int argc, char *argv[]) {
     waitAtBarrier();
     marker();
     while (!toFinished) {
-        for (unsigned long k = 0; k < 0xffffff; k++) yieldedTo = false;
+        for (unsigned long k = 0; k < 0xffffff && !toFinished; k++) yieldedTo = false;
         yieldedTo = true;
-        long const result = yieldTo();
-        if (yieldedTo) printf("yieldTo() failed\n");
+        yieldTo();
+        if (yieldedTo) printf("yieldTo failed\n");
         yieldedTo = false;
-        printf("yieldTo() returned %ld\n", result);
+
+        #if YieldBack
+            if (yieldedBack) {
+                printf("yieldBack worked\n");
+                yieldedBack = false;
+            } else printf("yieldBack failed\n");
+        #endif
     }
     pthread_join(to, NULL);
     destroyBarrier();
@@ -50,12 +59,18 @@ static void *toLogic(void *ignored) {
     waitAtBarrier();
     sched_yield();
     marker();
-    for (int i = 0; i < Load_Factor * 10; i++)
+    for (int i = 0; i < Load_Factor; i++)
         for (unsigned long k = 0; k < 0xffffff; k++) {
             if (yieldedTo) {
                 printf("yieldTo worked!\n");
                 yieldedTo = false;
-                deboost();
+
+                #if YieldBack
+                    yieldedBack = true;
+                    yieldBack();
+                    if (yieldedBack) printf("yieldBack failed!\n");
+                    yieldedBack = false;
+                #endif
             }
         }
     printf("yieldTo target finished execution\n");
@@ -67,8 +82,12 @@ static void *busy(void *ignored) {
     UNUSED(ignored);
     for (int i = 0; i < Load_Factor; i++)
         for (unsigned long k = 0; k < 0xffffff; k++) {
-            if (yieldedTo) printf("yieldTo() failed\n");
+            if (yieldedTo) printf("yieldTo failed\n");
             yieldedTo = false;
+            #if YieldBack
+                if (yieldedBack) printf("yieldBack failed\n");
+                yieldedBack = false;
+            #endif
         }
     return NULL;
 }
