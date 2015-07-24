@@ -3,6 +3,7 @@
 
 #define UNUSED(expr) do { (void)(expr); } while (0)
 
+void deboost();
 void marker();
 void registerPreemptionHook();
 void setToId();

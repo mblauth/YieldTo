@@ -21,7 +21,9 @@ inline void marker() {
   syscall(SYS_gettid);
 }
 
-void registerPreemptionHook() {} // not needed on Linux
+// not needed on Linux
+void deboost() {}
+void registerPreemptionHook() {}
 
 inline void setToId() {
   toId = syscall(SYS_gettid);

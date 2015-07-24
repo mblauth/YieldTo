@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+void deboost(){}
 void marker(){}
 void registerPreemptionHook() {}
 void setToId(){}

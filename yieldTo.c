@@ -55,14 +55,7 @@ static void *toLogic(void *ignored) {
             if (yieldedTo) {
                 printf("yieldTo worked!\n");
                 yieldedTo = false;
-                #ifdef __PikeOS__
-                    printf("deboosting\n");
-                    struct sched_param param = { .sched_priority = Realtime_Priority };
-                    if (pthread_setschedparam(to, Scheduling_Policy, &param) != 0) {
-                        printf("deboosting failed\n");
-                        exit(8);
-                    }
-                #endif
+                deboost();
             }
         }
     printf("yieldTo target finished execution\n");

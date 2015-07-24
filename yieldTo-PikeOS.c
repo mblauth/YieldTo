@@ -17,6 +17,15 @@ static volatile pthread_t toId;
 
 void marker(){} // not implemented
 
+void deboost() {
+  printf("deboosting\n");
+  struct sched_param param = { .sched_priority = Realtime_Priority };
+  if (pthread_setschedparam(to, Scheduling_Policy, &param) != 0) {
+    printf("deboosting failed\n");
+    exit(8);
+  }
+}
+
 void registerPreemptionHook() {
   if (__set_sched_hook(SCHED_PREEMPT_HOOK, preempt_hook) == (__sched_hook_t *) - 1) {
     printf("failed to register preemption hook\n");
