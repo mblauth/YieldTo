@@ -4,6 +4,7 @@
 #include <stdbool.h>
 
 #include "yieldTo.h"
+#include "barrier.h"
 
 #define Scheduling_Policy SCHED_RR
 #define Realtime_Priority 75
@@ -12,11 +13,6 @@
 
 static pthread_t tid[Background_Thread_Number];
 static pthread_t to;
-#ifdef HaveBarriers
-static pthread_barrier_t barrier;
-#else
-static volatile bool toInitialized = false;
-#endif
 
 static volatile bool yieldedTo = false;
 static volatile bool toFinished = false;
@@ -38,18 +34,11 @@ static inline long yieldTo(thread_id const ignored) { // not a yieldTo(), just h
 void main(int argc, char *argv[]) {
     singleCoreOnly();
     setRealtimeParameters(pthread_self());
-#ifdef HaveBarriers
-    pthread_barrier_init(&barrier, NULL, 2);
-#endif
+    initBarrier();
     pthread_create(&to, NULL, &toLogic, NULL);
     createBackgroundThreads();
     registerPreemptionHook();
-#ifdef HaveBarriers
-    pthread_barrier_wait(&barrier);
-    printf("post barrier\n");
-#else
-    while(!toInitialized) sched_yield();
-#endif
+    waitAtBarrier();
     marker();
     while (!toFinished) {
         for (unsigned long k = 0; k < 0xffffff; k++) yieldedTo = false;
@@ -59,21 +48,14 @@ void main(int argc, char *argv[]) {
         printf("yieldTo() returned %ld\n", result);
     }
     pthread_join(to, NULL);
-#ifdef HaveBarriers
-    pthread_barrier_destroy(&barrier);
-#endif
+    destroyBarrier();
     joinBackgroundThreads();
 }
 
 static void *toLogic(void *ignored) {
     UNUSED(ignored);
     setToId();
-#ifdef HaveBarriers
-    pthread_barrier_wait(&barrier);
-    printf("post barrier\n");
-#else
-    toInitialized = true;
-#endif
+    waitAtBarrier();
     sched_yield();
     marker();
     for (int i = 0; i < Load_Factor * 10; i++)
