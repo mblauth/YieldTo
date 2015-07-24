@@ -15,6 +15,8 @@
 #define __NR_sched_yieldTo 323
 #endif
 
+static volatile long toId;
+
 inline void marker() {
   syscall(SYS_gettid);
 }
@@ -37,10 +39,10 @@ void singleCoreOnly() {
   }
 }
 
-inline long yieldTo(long const id) {
-  if (!id) {
+inline long yieldTo() {
+  if (!toId) {
     perror("could not find thread\n");
     exit(2);
   }
-  return syscall(__NR_sched_yieldTo, id);
+  return syscall(__NR_sched_yieldTo, toId);
 }

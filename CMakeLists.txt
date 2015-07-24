@@ -1,10 +1,10 @@
 cmake_minimum_required(VERSION 3.2)
 project(YieldTo C)
-include(CheckFunctionExists)
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 set(BarrierImplementation pthread-barrier.c)
+set(YieldToImplementation yield-posix.c)
 if(PIKEOS)
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DPIKEOS_POSIX_PSE52 -DPIKEOS_POSIX_SCHEDULER_HOOK=true -fno-builtin -fno-unit-at-a-time -nostdinc -fno-strict-aliasing -msoft-float")
   set(CMAKE_FIND_ROOT_PATH /opt/pikeos-3.5)
@@ -18,6 +18,10 @@ if(PIKEOS)
   link_directories(SYSTEM ${CMAKE_FIND_ROOT_PATH}/target/ppc/e500/lib
                    SYSTEM ${CMAKE_FIND_ROOT_PATH}/target/ppc/e500/bposix/os/up)
   set(BarrierImplementation polling-barrier.c) # not so POSIX…
+  set(YieldToImplementation yieldTo-PikeOS.c)
+elseif(${CMAKE_SYSTEM} MATCHES "Linux")
+  set(BarrierImplementation pthread-barrier.c)
+  set(YieldToImplementation yieldTo-Linux.c)
 endif()
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99") # PikeOS toolchain does not support c11
@@ -25,7 +29,7 @@ add_definitions(-D_GNU_SOURCE)
 set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
 find_package(Threads REQUIRED)
 
-add_executable(YieldTo yieldTo.c yieldTo-Linux.c yieldTo.h barrier.h ${BarrierImplementation})
+add_executable(YieldTo yieldTo.c yieldTo.h barrier.h ${BarrierImplementation} ${YieldToImplementation})
 
 if(PIKEOS)
   set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -T${CMAKE_FIND_ROOT_PATH}/target/ppc/e500/scripts/app-ld-script ${CMAKE_FIND_ROOT_PATH}/target/ppc/e500/bposix/os/up/crt0.o ${POSIXLIBS}/pse52.o ${POSIXLIBS}/pse52_ext2fs.o ${POSIXLIBS}/pse52_ufs.o ${POSIXLIBS}/rootfs.a")

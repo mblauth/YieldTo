@@ -11,6 +11,10 @@
 #define Background_Thread_Number 20
 #define Load_Factor 5
 
+// works via a preemption-notification, not a direct yieldTo
+static volatile bool preempted = false;
+static volatile pthread_t toId;
+
 void marker(){} // not implemented
 
 void registerPreemptionHook() {
@@ -33,9 +37,6 @@ void singleCoreOnly() {
   }
 }
 
-// works via a preemption-notification, not a direct yieldTo
-static volatile bool preempted = false;
-
 static int preempt_hook(unsigned cpu, pthread_t t_old, pthread_t t_new) {
   UNUSED(cpu); UNUSED(t_old); UNUSED(t_new);
   if (yieldedTo) return false;
@@ -43,10 +44,10 @@ static int preempt_hook(unsigned cpu, pthread_t t_old, pthread_t t_new) {
   return true;
 }
 
-inline long yieldTo(pthread_t const to) {
+inline long yieldTo() {
   printf("boosting\n");
   struct sched_param param = { .sched_priority = Realtime_Priority + 1 };
-  if (pthread_setschedparam(to, Scheduling_Policy, &param) != 0) {
+  if (pthread_setschedparam(toId, Scheduling_Policy, &param) != 0) {
     printf("boosting failed\n");
     exit(7);
   }

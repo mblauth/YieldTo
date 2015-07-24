@@ -22,15 +22,6 @@ static void joinBackgroundThreads();
 static void *toLogic(void *);
 static void setRealtimeParameters(pthread_t thread);
 
-#if !defined(__linux) && !defined(__PikeOS__)
-static inline long yieldTo(thread_id const ignored) { // not a yieldTo(), just here for testing
-    UNUSED(ignored);
-    sched_yield();
-    return 0;
-}
-#endif
-
-
 void main(int argc, char *argv[]) {
     singleCoreOnly();
     setRealtimeParameters(pthread_self());
@@ -43,7 +34,8 @@ void main(int argc, char *argv[]) {
     while (!toFinished) {
         for (unsigned long k = 0; k < 0xffffff; k++) yieldedTo = false;
         yieldedTo = true;
-        long const result = yieldTo(toId);
+        long const result = yieldTo();
+        if (yieldedTo) printf("yieldTo() failed\n");
         yieldedTo = false;
         printf("yieldTo() returned %ld\n", result);
     }
@@ -81,8 +73,10 @@ static void *toLogic(void *ignored) {
 static void *busy(void *ignored) {
     UNUSED(ignored);
     for (int i = 0; i < Load_Factor; i++)
-        for (unsigned long k = 0; k < 0xffffff; k++)
+        for (unsigned long k = 0; k < 0xffffff; k++) {
+            if (yieldedTo) printf("yieldTo() failed\n");
             yieldedTo = false;
+        }
     return NULL;
 }
 
