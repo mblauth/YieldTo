@@ -1,29 +1,34 @@
 cmake_minimum_required(VERSION 3.2)
 project(YieldTo C)
+include(CheckFunctionExists)
+
+option(HaveBarriers "Have pthread barriers" ON)
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 if(PIKEOS)
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DPIKEOS_POSIX_PSE52 -DPIKEOS_POSIX_SCHEDULER_HOOK=true -fno-builtin -fno-unit-at-a-time -nostdinc -fno-strict-aliasing -msoft-float")
-set(CMAKE_FIND_ROOT_PATH /opt/pikeos-3.5)
-set(POSIXLIBS ${CMAKE_FIND_ROOT_PATH}/target/ppc/e500/bposix/lib/)
-set(CMAKE_C_COMPILER ${CMAKE_FIND_ROOT_PATH}/cdk/ppc/e500/bin/ppc_e500-gcc)
-set(CMAKE_LINKER ${CMAKE_FIND_ROOT_PATH}/cdk/ppc/e500/bin/ppc_e500-ld)
-set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
-set(CMAKE_FIND_ROOT_PATH_NIDE_LIBRARY ONLY)
-set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
-include_directories(SYSTEM ${CMAKE_FIND_ROOT_PATH}/target/ppc/e500/bposix/include)
-link_directories(SYSTEM ${CMAKE_FIND_ROOT_PATH}/target/ppc/e500/lib
-                 SYSTEM ${CMAKE_FIND_ROOT_PATH}/target/ppc/e500/bposix/os/up)
-
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DPIKEOS_POSIX_PSE52 -DPIKEOS_POSIX_SCHEDULER_HOOK=true -fno-builtin -fno-unit-at-a-time -nostdinc -fno-strict-aliasing -msoft-float")
+  set(CMAKE_FIND_ROOT_PATH /opt/pikeos-3.5)
+  set(POSIXLIBS ${CMAKE_FIND_ROOT_PATH}/target/ppc/e500/bposix/lib/)
+  set(CMAKE_C_COMPILER ${CMAKE_FIND_ROOT_PATH}/cdk/ppc/e500/bin/ppc_e500-gcc)
+  set(CMAKE_LINKER ${CMAKE_FIND_ROOT_PATH}/cdk/ppc/e500/bin/ppc_e500-ld)
+  set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+  set(CMAKE_FIND_ROOT_PATH_NIDE_LIBRARY ONLY)
+  set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+  include_directories(SYSTEM ${CMAKE_FIND_ROOT_PATH}/target/ppc/e500/bposix/include)
+  link_directories(SYSTEM ${CMAKE_FIND_ROOT_PATH}/target/ppc/e500/lib
+                   SYSTEM ${CMAKE_FIND_ROOT_PATH}/target/ppc/e500/bposix/os/up)
+  set(HaveBarriers OFF)
+else()
+  set(HaveBarriers ON)
 endif()
 
-
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99") # PikeOS toolchain does not support c11
-set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
 add_definitions(-D_GNU_SOURCE)
-
+set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
 find_package(Threads REQUIRED)
 
-add_executable(YieldTo yieldTo.c)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
+add_executable(YieldTo yieldTo.c yieldTo-Linux.c yieldTo.h)
 
 if(PIKEOS)
   set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -T${CMAKE_FIND_ROOT_PATH}/target/ppc/e500/scripts/app-ld-script ${CMAKE_FIND_ROOT_PATH}/target/ppc/e500/bposix/os/up/crt0.o ${POSIXLIBS}/pse52.o ${POSIXLIBS}/pse52_ext2fs.o ${POSIXLIBS}/pse52_ufs.o ${POSIXLIBS}/rootfs.a")
@@ -34,6 +39,9 @@ if(PIKEOS)
 else()
   target_link_libraries(YieldTo ${CMAKE_THREAD_LIBS_INIT})
 endif()
+
+
+
 find_program(SCP_EXECUTABLE scp)
 if(WANT_SCP)
   if(SCP_EXECUTABLE)
