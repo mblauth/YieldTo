@@ -1,3 +1,7 @@
+#ifdef __QNX__
+ #define _QNX_SOURCE 1
+ #include <sync.h>
+#endif
 #include <pthread.h>
 
 #include "barrier.h"

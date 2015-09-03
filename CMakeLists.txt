@@ -19,15 +19,35 @@ if(PIKEOS)
                    SYSTEM ${CMAKE_FIND_ROOT_PATH}/target/ppc/e500/bposix/os/up)
   set(BarrierImplementation polling-barrier.c) # not so POSIX…
   set(YieldToImplementation yieldTo-PikeOS.c)
+elseif(QNX)
+  set(QNX_TARGET $ENV{QNX_TARGET})
+  if(NOT EXISTS ${QNX_TARGET})
+    MESSAGE(FATAL_ERROR "QNX_TARGET incorrect: ${QNX_TARGET}")
+  endif()
+  set(QNX_HOST $ENV{QNX_HOST})
+  if(NOT EXISTS ${QNX_HOST})
+    MESSAGE(FATAL_ERROR "QNX_HOST incorrect: ${QNX_HOST}")
+  endif()
+
+  set(CMAKE_FIND_ROOT_PATH ${QNX_TARGET}/usr/include)
+  set(POSIXLIBS ${CMAKE_FIND_ROOT_PATH}/target/qnx6/x86/usr/lib/)
+  set(CMAKE_C_COMPILER ${QNX_HOST}/usr/bin/i486-pc-nto-qnx6.6.0-gcc)
+  set(CMAKE_LINKER ${QNX_HOST}/usr/bin/i486-pc-nto-qnx6.6.0-ld)
+
+  set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+  set(CMAKE_FIND_ROOT_PATH_NIDE_LIBRARY ONLY)
+  set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+  include_directories(SYSTEM ${CMAKE_FIND_ROOT_PATH})
+  link_directories(SYSTEM ${POSIXLIBS})
+  set(BarrierImplementation pthread-barrier.c) # not so POSIX…
+  set(YieldToImplementation yieldTo-qnx.c)
 elseif(${CMAKE_SYSTEM} MATCHES "Linux")
   set(BarrierImplementation pthread-barrier.c)
-  set(YieldToImplementation yieldTo-Linux.c)
+  set(YieldToImplementation yield-posix.c)
 endif()
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99") # PikeOS toolchain does not support c11
 add_definitions(-D_GNU_SOURCE)
-set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
-find_package(Threads REQUIRED)
 
 add_executable(YieldTo yieldTo.c yieldTo.h barrier.h ${BarrierImplementation} ${YieldToImplementation})
 
@@ -37,8 +57,10 @@ if(PIKEOS)
   if(PIKEOS_TARGET)
     install(PROGRAMS ${CMAKE_BINARY_DIR}/YieldTo DESTINATION ${PIKEOS_TARGET} RENAME posix)
   endif()
-else()
+elseif(QNX)
   target_link_libraries(YieldTo ${CMAKE_THREAD_LIBS_INIT})
+else()
+  target_link_libraries(YieldTo pthread ${CMAKE_THREAD_LIBS_INIT})
 endif()
 
 
