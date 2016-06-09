@@ -15,26 +15,18 @@
 volatile bool yieldedTo = false;
 
 static pthread_t tid[Background_Thread_Number];
+static pthread_t to;
 
 static volatile bool yieldedBack = false;
 static volatile bool toFinished = false;
 
-static void createBackgroundThreads();
-
-static void joinBackgroundThreads();
-
-static void *toLogic(void *);
-
-static void setRealtimeParameters(pthread_t thread);
+static void setupResources();
+static void startThreads();
+static void joinThreads();
 
 void main(int argc, char *argv[]) {
-  singleCoreOnly();
-  setRealtimeParameters(pthread_self());
-  setFromId();
-  initBarrier();
-  pthread_t to;
-  pthread_create(&to, NULL, &toLogic, NULL);
-  createBackgroundThreads();
+  setupResources();
+  startThreads();
   registerPreemptionHook();
   waitAtBarrier();
   marker();
@@ -53,9 +45,8 @@ void main(int argc, char *argv[]) {
     } else printf("yieldBack failed\n");
 #endif
   }
-  pthread_join(to, NULL);
+  joinThreads();
   destroyBarrier();
-  joinBackgroundThreads();
 }
 
 static void *toLogic(void *ignored) {
@@ -83,6 +74,10 @@ static void *toLogic(void *ignored) {
   return NULL;
 }
 
+static void startToThread() {
+  pthread_create(&to, NULL, &toLogic, NULL);
+}
+
 static void *busy(void *ignored) {
   UNUSED(ignored);
   for (int i = 0; i < Load_Factor; i++)
@@ -97,12 +92,7 @@ static void *busy(void *ignored) {
   return NULL;
 }
 
-static void joinBackgroundThreads() {
-  for (int i = 0; i < Background_Thread_Number; i++)
-    pthread_join(tid[i], NULL);
-}
-
-static void createBackgroundThreads() {
+static void startBackgroundThreads() {
   printf("creating %i background threads...", Background_Thread_Number);
 #if Scheduling_Policy == SCHED_FIFO || Scheduling_Policy == SCHED_RR
   pthread_attr_t attr;
@@ -129,6 +119,21 @@ static void createBackgroundThreads() {
   printf("done\n");
 }
 
+static void startThreads() {
+  startToThread();
+  startBackgroundThreads();
+}
+
+static void joinBackgroundThreads() {
+  for (int i = 0; i < Background_Thread_Number; i++)
+    pthread_join(tid[i], NULL);
+}
+
+static void joinThreads() {
+  pthread_join(to, NULL);
+  joinBackgroundThreads();
+}
+
 static void setRealtimeParameters(pthread_t thread) {
 #if Scheduling_Policy == SCHED_FIFO || Scheduling_Policy == SCHED_RR
   printf("setting realtime parameters\n");
@@ -143,4 +148,11 @@ static void setRealtimeParameters(pthread_t thread) {
   printf("RR interval: %ld s %ld ns\n", interval.tv_sec, interval.tv_nsec);
 #endif
 #endif
+}
+
+static void setupResources() {
+  singleCoreOnly();
+  setRealtimeParameters(pthread_self());
+  setFromId();
+  initBarrier();
 }
