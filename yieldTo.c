@@ -22,124 +22,126 @@ static volatile bool yieldedBack = false;
 static volatile bool toFinished = false;
 
 static void createBackgroundThreads();
+
 static void joinBackgroundThreads();
+
 static void *toLogic(void *);
+
 static void setRealtimeParameters(pthread_t thread);
 
 void main(int argc, char *argv[]) {
-    singleCoreOnly();
-    setRealtimeParameters(pthread_self());
-    setFromId();
-    initBarrier();
-    pthread_create(&to, NULL, &toLogic, NULL);
-    createBackgroundThreads();
-    registerPreemptionHook();
-    waitAtBarrier();
-    marker();
-    while (!toFinished) {
-        for (unsigned long k = 0; k < 0xffffff && !toFinished; k++) yieldedTo = false;
-        yieldedTo = true;
-        yieldTo();
-        if (yieldedTo) printf("yieldTo failed\n");
-        yieldedTo = false;
+  singleCoreOnly();
+  setRealtimeParameters(pthread_self());
+  setFromId();
+  initBarrier();
+  pthread_create(&to, NULL, &toLogic, NULL);
+  createBackgroundThreads();
+  registerPreemptionHook();
+  waitAtBarrier();
+  marker();
+  while (!toFinished) {
+    for (unsigned long k = 0; k < 0xffffff && !toFinished; k++)
+      yieldedTo = false;
+    yieldedTo = true;
+    yieldTo();
+    if (yieldedTo) printf("yieldTo failed\n");
+    yieldedTo = false;
 
-        #if YieldBack
-            if (yieldedBack) {
-                printf("yieldBack worked\n");
-                yieldedBack = false;
-            } else printf("yieldBack failed\n");
-        #endif
-    }
-    pthread_join(to, NULL);
-    destroyBarrier();
-    joinBackgroundThreads();
+#if YieldBack
+    if (yieldedBack) {
+      printf("yieldBack worked\n");
+      yieldedBack = false;
+    } else printf("yieldBack failed\n");
+#endif
+  }
+  pthread_join(to, NULL);
+  destroyBarrier();
+  joinBackgroundThreads();
 }
 
 static void *toLogic(void *ignored) {
-    UNUSED(ignored);
-    setToId();
-    waitAtBarrier();
-    sched_yield();
-    marker();
-    for (int i = 0; i < Load_Factor; i++)
-        for (unsigned long k = 0; k < 0xffffff; k++) {
-            if (yieldedTo) {
-                printf("yieldTo worked!\n");
-                yieldedTo = false;
+  UNUSED(ignored);
+  setToId();
+  waitAtBarrier();
+  sched_yield();
+  marker();
+  for (int i = 0; i < Load_Factor; i++)
+    for (unsigned long k = 0; k < 0xffffff; k++) {
+      if (yieldedTo) {
+        printf("yieldTo worked!\n");
+        yieldedTo = false;
 
-                #if YieldBack
-                    yieldedBack = true;
-                    yieldBack();
-                    if (yieldedBack) printf("yieldBack failed!\n");
-                    yieldedBack = false;
-                #endif
-            }
-        }
-    printf("yieldTo target finished execution\n");
-    toFinished = true;
-    return NULL;
+#if YieldBack
+        yieldedBack = true;
+        yieldBack();
+        if (yieldedBack) printf("yieldBack failed!\n");
+        yieldedBack = false;
+#endif
+      }
+    }
+  printf("yieldTo target finished execution\n");
+  toFinished = true;
+  return NULL;
 }
 
 static void *busy(void *ignored) {
-    UNUSED(ignored);
-    for (int i = 0; i < Load_Factor; i++)
-        for (unsigned long k = 0; k < 0xffffff; k++) {
-            if (yieldedTo) printf("yieldTo failed\n");
-            yieldedTo = false;
-            #if YieldBack
-                if (yieldedBack) printf("yieldBack failed\n");
-                yieldedBack = false;
-            #endif
-        }
-    return NULL;
+  UNUSED(ignored);
+  for (int i = 0; i < Load_Factor; i++)
+    for (unsigned long k = 0; k < 0xffffff; k++) {
+      if (yieldedTo) printf("yieldTo failed\n");
+      yieldedTo = false;
+#if YieldBack
+      if (yieldedBack) printf("yieldBack failed\n");
+      yieldedBack = false;
+#endif
+    }
+  return NULL;
 }
 
 static void joinBackgroundThreads() {
-    for (int i = 0; i < Background_Thread_Number; i++)
-        pthread_join(tid[i], NULL);
+  for (int i = 0; i < Background_Thread_Number; i++)
+    pthread_join(tid[i], NULL);
 }
 
 static void createBackgroundThreads() {
-    printf("creating %i background threads...", Background_Thread_Number);
+  printf("creating %i background threads...", Background_Thread_Number);
 #if Scheduling_Policy == SCHED_FIFO || Scheduling_Policy == SCHED_RR
-    pthread_attr_t attr;
-    if (pthread_attr_init(&attr) != 0) {
-        printf("thread attr init failure");
-        exit(3);
-    }
-    if (pthread_attr_setschedpolicy(&attr, Scheduling_Policy)) {
-        printf("could not set realtime policy\n");
-        exit(4);
-    }
-    struct sched_param param = { .sched_priority = Realtime_Priority };
-    if (pthread_attr_setschedparam(&attr, &param)) {
-        printf("could not set realtime priority\n");
-        exit(4);
-    }
-    for (int i = 0; i < Background_Thread_Number; i++)
-        pthread_create(&tid[i], &attr, &busy, NULL);
-    pthread_attr_destroy(&attr);
+  pthread_attr_t attr;
+  if (pthread_attr_init(&attr) != 0) {
+    printf("thread attr init failure");
+    exit(3);
+  }
+  if (pthread_attr_setschedpolicy(&attr, Scheduling_Policy)) {
+    printf("could not set realtime policy\n");
+    exit(4);
+  }
+  struct sched_param param = {.sched_priority = Realtime_Priority};
+  if (pthread_attr_setschedparam(&attr, &param)) {
+    printf("could not set realtime priority\n");
+    exit(4);
+  }
+  for (int i = 0; i < Background_Thread_Number; i++)
+    pthread_create(&tid[i], &attr, &busy, NULL);
+  pthread_attr_destroy(&attr);
 #else
-    for (int i = 0; i < Background_Thread_Number; i++)
-        pthread_create(&tid[i], NULL, &busy, NULL);
+  for (int i = 0; i < Background_Thread_Number; i++)
+      pthread_create(&tid[i], NULL, &busy, NULL);
 #endif
-    printf("done\n");
+  printf("done\n");
 }
 
 static void setRealtimeParameters(pthread_t thread) {
 #if Scheduling_Policy == SCHED_FIFO || Scheduling_Policy == SCHED_RR
-    printf("setting realtime parameters\n");
-    struct sched_param param = { .sched_priority = Realtime_Priority };
-    if (pthread_setschedparam(thread, Scheduling_Policy, &param)) {
-        printf("could not set realtime parameters\n");
-        exit(5);
-    }
-#ifdef _POSIX_PRIORITY_SCHEDULING
-  #if Scheduling_Policy == SCHED_RR
-    struct timespec interval;
-    sched_rr_get_interval(0, &interval);
-    printf("RR interval: %ld s %ld ns\n", interval.tv_sec, interval.tv_nsec);
-    #endif
-  #endif
+  printf("setting realtime parameters\n");
+  struct sched_param param = {.sched_priority = Realtime_Priority};
+  if (pthread_setschedparam(thread, Scheduling_Policy, &param)) {
+    printf("could not set realtime parameters\n");
+    exit(5);
+  }
+#if defined(_POSIX_PRIORITY_SCHEDULING) && Scheduling_Policy == SCHED_RR
+  struct timespec interval;
+  sched_rr_get_interval(0, &interval);
+  printf("RR interval: %ld s %ld ns\n", interval.tv_sec, interval.tv_nsec);
+#endif
 #endif
 }
