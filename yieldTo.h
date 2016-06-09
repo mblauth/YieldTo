@@ -6,7 +6,6 @@
 #define UNUSED(expr) do { (void)(expr); } while (0)
 
 extern volatile bool yieldedTo;
-extern pthread_t to;
 
 void deboost();
 void marker();

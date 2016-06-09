@@ -17,13 +17,21 @@
 
 // works via a preemption-notification, not a direct yieldTo
 static volatile bool preempted = false;
-static volatile pthread_t toId;
+
+static volatile pthread_t to;
+static volatile pthread_t back;
 
 void marker(){} // not implemented
-void setFromId(){} // not needed
-void setToId(){} // not needed
-void yieldBack(){} // not needed
 
+void setFromId() {
+  // Todo: Implement
+}
+
+void setToId() {
+  // Todo: Implement
+}
+
+// Todo: use this
 void deboost() {
   printf("deboosting\n");
   struct sched_param param = { .sched_priority = Realtime_Priority };
@@ -48,17 +56,28 @@ void registerPreemptionHook() {
   printf("registered preemption hook\n");
 }
 
-
-inline void yieldTo() {
+static inline void boost(pthread_t id) {
   printf("boosting\n");
   struct sched_param param = { .sched_priority = Realtime_Priority + 1 };
-  if (pthread_setschedparam(toId, Scheduling_Policy, &param) != 0) {
+  if (pthread_setschedparam(id, Scheduling_Policy, &param) != 0) {
     printf("boosting failed\n");
     exit(7);
   }
+}
+
+static inline void yield(pthread_t id) {
+  boost(id);
   if (preempted) {
     preempted = false;
     printf("re-allowing preemption\n");
     __revert_sched_boost(pthread_self());
   }
+}
+
+inline void yieldTo() {
+  yield(to);
+}
+
+inline void yieldBack() {
+  yield(back);
 }

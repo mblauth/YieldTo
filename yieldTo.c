@@ -12,9 +12,7 @@
 #define Load_Factor 10
 #define YieldBack true
 
-
 volatile bool yieldedTo = false;
-pthread_t to;
 
 static pthread_t tid[Background_Thread_Number];
 
@@ -34,6 +32,7 @@ void main(int argc, char *argv[]) {
   setRealtimeParameters(pthread_self());
   setFromId();
   initBarrier();
+  pthread_t to;
   pthread_create(&to, NULL, &toLogic, NULL);
   createBackgroundThreads();
   registerPreemptionHook();
