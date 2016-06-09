@@ -34,18 +34,6 @@ inline void setToId() {
   toId = syscall(SYS_gettid);
 }
 
-void singleCoreOnly() {
-  cpu_set_t cpuSet;
-  CPU_ZERO(&cpuSet);
-  CPU_SET(0, &cpuSet);
-
-  int s = pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuSet);
-  if (s != 0) {
-    perror("could not set affinity");
-    exit(1);
-  }
-}
-
 static inline long yield(long id) {
   if (!id) {
     perror("could not find thread\n");
