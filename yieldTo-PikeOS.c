@@ -3,6 +3,10 @@
 #endif
 
 #include <sys/sched_hook.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <pthread.h>
+#include <stdlib.h>
 
 #include "yieldTo.h"
 
@@ -16,6 +20,9 @@ static volatile bool preempted = false;
 static volatile pthread_t toId;
 
 void marker(){} // not implemented
+void setFromId(){} // not needed
+void setToId(){} // not needed
+void yieldBack(){} // not needed
 
 void deboost() {
   printf("deboosting\n");
@@ -24,6 +31,13 @@ void deboost() {
     printf("deboosting failed\n");
     exit(8);
   }
+}
+
+static int preempt_hook(unsigned cpu, pthread_t t_old, pthread_t t_new) {
+  UNUSED(cpu); UNUSED(t_old); UNUSED(t_new);
+  if (yieldedTo) return false;
+  preempted = true;
+  return true;
 }
 
 void registerPreemptionHook() {
@@ -46,14 +60,8 @@ void singleCoreOnly() {
   }
 }
 
-static int preempt_hook(unsigned cpu, pthread_t t_old, pthread_t t_new) {
-  UNUSED(cpu); UNUSED(t_old); UNUSED(t_new);
-  if (yieldedTo) return false;
-  preempted = true;
-  return true;
-}
 
-inline long yieldTo() {
+inline void yieldTo() {
   printf("boosting\n");
   struct sched_param param = { .sched_priority = Realtime_Priority + 1 };
   if (pthread_setschedparam(toId, Scheduling_Policy, &param) != 0) {
@@ -65,5 +73,4 @@ inline long yieldTo() {
     printf("re-allowing preemption\n");
     __revert_sched_boost(pthread_self());
   }
-  return 0;
 }

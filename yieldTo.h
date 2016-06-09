@@ -1,7 +1,12 @@
-#ifndef YIELDTO_H
-#define YIELDTO_H
+#pragma once
+
+#include <pthread.h>
+#include <stdbool.h>
 
 #define UNUSED(expr) do { (void)(expr); } while (0)
+
+extern volatile bool yieldedTo;
+extern pthread_t to;
 
 void deboost();
 void marker();
@@ -11,5 +16,3 @@ void setToId();
 void singleCoreOnly();
 void yieldBack();
 void yieldTo();
-
-#endif //YIELDTO_H

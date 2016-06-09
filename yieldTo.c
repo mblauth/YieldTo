@@ -12,10 +12,12 @@
 #define Load_Factor 10
 #define YieldBack true
 
-static pthread_t tid[Background_Thread_Number];
-static pthread_t to;
 
-static volatile bool yieldedTo = false;
+volatile bool yieldedTo = false;
+pthread_t to;
+
+static pthread_t tid[Background_Thread_Number];
+
 static volatile bool yieldedBack = false;
 static volatile bool toFinished = false;
 

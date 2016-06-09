@@ -49,7 +49,7 @@ endif()
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99") # PikeOS toolchain does not support c11
 add_definitions(-D_GNU_SOURCE)
 
-add_executable(YieldTo yieldTo.c yieldTo.h barrier.h ${BarrierImplementation} ${YieldToImplementation})
+add_executable(YieldTo yieldTo.c ${BarrierImplementation} ${YieldToImplementation})
 
 if(PIKEOS)
   set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -T${CMAKE_FIND_ROOT_PATH}/target/ppc/e500/scripts/app-ld-script ${CMAKE_FIND_ROOT_PATH}/target/ppc/e500/bposix/os/up/crt0.o ${POSIXLIBS}/pse52.o ${POSIXLIBS}/pse52_ext2fs.o ${POSIXLIBS}/pse52_ufs.o ${POSIXLIBS}/rootfs.a")
