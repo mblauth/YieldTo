@@ -5,12 +5,8 @@
 
 #include "yieldTo.h"
 #include "barrier.h"
-
-#define Scheduling_Policy SCHED_RR
-#define Realtime_Priority 63 // 63 is the maximum value on QNX
-#define Background_Thread_Number 20
-#define Load_Factor 10
-#define YieldBack true
+#include "config.h"
+#include "error.h"
 
 volatile bool yieldedTo = false;
 
@@ -23,6 +19,7 @@ static volatile bool toFinished = false;
 static void setupResources();
 static void startThreads();
 static void joinThreads();
+static void checkedYieldTo();
 
 int main(int argc, char *argv[]) {
   printf("launching yieldTo\n");
@@ -34,20 +31,25 @@ int main(int argc, char *argv[]) {
   while (!toFinished) {
     for (unsigned long k = 0; k < 0xffffff && !toFinished; k++)
       yieldedTo = false;
-    yieldedTo = true;
-    yieldTo();
-    if (yieldedTo) printf("yieldTo failed\n");
-    yieldedTo = false;
+    checkedYieldTo();
 
 #if YieldBack
     if (yieldedBack) {
       printf("yieldBack worked\n");
       yieldedBack = false;
+      deboost();
     } else printf("yieldBack failed\n");
 #endif
   }
   joinThreads();
   destroyBarrier();
+}
+
+static void checkedYieldTo() {
+  yieldedTo = true;
+  yieldTo();  // resets yieldedTo to false
+  if (yieldedTo) fail(yieldToFail);
+  yieldedTo = false;
 }
 
 static void *toLogic(void *ignored) {
@@ -61,6 +63,7 @@ static void *toLogic(void *ignored) {
       if (yieldedTo) {
         printf("yieldTo worked!\n");
         yieldedTo = false;
+        deboost();
 
 #if YieldBack
         yieldedBack = true;
