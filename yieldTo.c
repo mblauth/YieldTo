@@ -37,7 +37,7 @@ int main(int argc, char *argv[]) {
       printf("yieldBack worked\n");
       yieldedBack = false;
       deboost();
-    } else printf("yieldBack failed\n");
+    } else fail(yieldBackFail, "yieldBack failed, status flag unchanged.");
   }
   joinThreads();
   destroyBarrier();
@@ -46,7 +46,7 @@ int main(int argc, char *argv[]) {
 static void checkedYieldTo() {
   yieldedTo = true;
   yieldTo();  // resets yieldedTo to false
-  if (yieldedTo) fail(yieldToFail);
+  if (yieldedTo) fail(yieldToFail, "yieldTo failed, still in from.");
   yieldedTo = false;
 }
 
@@ -65,7 +65,7 @@ static void *toLogic(void *ignored) {
 
         yieldedBack = true;
         yieldBack();
-        if (yieldedBack) printf("yieldBack failed!\n");
+        if (yieldedBack) fail(yieldBackFail, "yieldBack failed, still in to.");
         yieldedBack = false;
       }
     }
@@ -82,9 +82,9 @@ static void *busy(void *ignored) {
   UNUSED(ignored);
   for (int i = 0; i < Load_Factor; i++)
     for (unsigned long k = 0; k < 0xffffff; k++) {
-      if (yieldedTo) printf("yieldTo failed\n");
+      if (yieldedTo) fail(yieldToFail, "yieldTo failed, in background thread.");
       yieldedTo = false;
-      if (yieldedBack) printf("yieldBack failed\n");
+      if (yieldedBack) fail(yieldBackFail, "yieldBack failed, in background thread.");
       yieldedBack = false;
     }
   return NULL;

@@ -12,8 +12,9 @@ enum errorcode {
 };
 
 enum failcode {
-  yieldToFail=100
+  yieldToFail=100,
+  yieldBackFail=101
 };
 
 void error(enum errorcode code, const char * message);
-void fail(enum failcode code);
+void fail(enum failcode code, const char * message);
