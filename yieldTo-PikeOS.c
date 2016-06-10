@@ -10,13 +10,14 @@
 
 #include "yieldTo.h"
 #include "error.h"
+#include "posixhelpers.h"
 
 #define Scheduling_Policy SCHED_RR
 #define Realtime_Priority 63
 
 
 // works via a preemption-notification, not a direct to
-static volatile bool preempted = false;
+static volatile bool kernelWantsPreemption = false;
 
 static volatile pthread_t to = NULL;
 static volatile pthread_t from = NULL;
@@ -24,15 +25,15 @@ static volatile pthread_t from = NULL;
 void marker(){} // not implemented
 
 void setFromId() {
-  if (from) exit(9);
-  if (to && to == from) exit(11);
+  if (from) error(fromAlreadySet, "from is already set");
+  if (to && to == from) error(fromAndToTheSame, "from and to are the same thread");
   from = pthread_self();
   printf("'from' is %p\n", from);
 }
 
 void setToId() {
-  if (to) exit (10);
-  if (from && to == from) exit(12);
+  if (to) error(toAlreadySet, "to is already set");
+  if (from && to == from) error(fromAndToTheSame, "from and to are the same thread");
   to = pthread_self();
   printf("'to' is %p\n", to);
 }
@@ -45,46 +46,40 @@ static char* getName(pthread_t thread) {
 
 void deboost() {
   printf("deboosting '%s'\n", getName(pthread_self()));
-  struct sched_param param = { .sched_priority = Realtime_Priority };
-  if (pthread_setschedparam(to, Scheduling_Policy, &param) != 0) {
-    printf("deboosting failed\n");
-    exit(8);
-  }
+  if (setPriority(pthread_self(), Realtime_Priority)) error(deboostError, "deboost failed");
 }
 
 static int preempt_hook(unsigned cpu, pthread_t t_old, pthread_t t_new) {
   UNUSED(cpu); UNUSED(t_old); UNUSED(t_new);
-  printf("kernel invoked pre-emption hook\n");
-  if (yieldedTo) return false;
-  preempted = true;
+  printf("kernel invoked pre-emption hook in %s\n", getName(pthread_self()));
+  if (t_old == from || t_old == to) {
+    kernelWantsPreemption = true;
+    return false;
+  }
   return true;
 }
 
 void registerPreemptionHook() {
-  /*if (__set_sched_hook(SCHED_PREEMPT_HOOK, preempt_hook) == (__sched_hook_t *) - 1) {
+  if (__set_sched_hook(SCHED_PREEMPT_HOOK, preempt_hook) == (__sched_hook_t *) - 1) {
     printf("failed to register pre-emption hook\n");
     exit(6);
   }
-  printf("registered pre-emption hook\n");*/
+  printf("registered pre-emption hook\n");
 }
 
 static inline void boost(pthread_t thread) {
   printf("boosting '%s'\n", getName(thread));
-  struct sched_param param = { .sched_priority = Realtime_Priority + 1 };
-  if (pthread_setschedparam(thread, Scheduling_Policy, &param) != 0)
-    error(boostError, "boosting failed");
+  if (setPriority(thread, Realtime_Priority + 1)) error(boostError, "boost failed");
 }
 
-static inline void yield(pthread_t id) {
+static inline void yield(pthread_t thread) {
   pthread_t self = pthread_self();
-  if (self == id) error(yieldToSelfError, "Tried to yield to self.");
-  boost(self); // we don't want to yield quite yet
-  boost(id);
-  if (preempted) {
-    preempted = false;
+  if (self == thread) error(yieldToSelfError, "Tried to yield to self.");
+  boost(thread);
+  if (kernelWantsPreemption) {
+    kernelWantsPreemption = false;
     printf("'%s' re-allows pre-emption\n", getName(self));
     __revert_sched_boost(self);
-    deboost(); // should imply yield
   }
 }
 

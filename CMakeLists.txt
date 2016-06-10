@@ -21,8 +21,8 @@ if(PIKEOS)
   link_directories(SYSTEM ${CMAKE_FIND_ROOT_PATH}/target/ppc/e500/lib
                    SYSTEM ${CMAKE_FIND_ROOT_PATH}/target/ppc/e500/bposix/os/up)
   set(BarrierImplementation polling-barrier.c) # not so POSIX…
-  #set(YieldToImplementation yieldTo-PikeOS.c)
-  set(YieldToImplementation boost-posix.c)
+  set(YieldToImplementation yieldTo-PikeOS.c)
+  #set(YieldToImplementation boost-posix.c)
 elseif(QNX)
   set(QNX_TARGET $ENV{QNX_TARGET})
   if(NOT EXISTS ${QNX_TARGET})
