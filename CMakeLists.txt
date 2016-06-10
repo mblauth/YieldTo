@@ -6,6 +6,7 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR})
 set(BarrierImplementation pthread-barrier.c)
 set(YieldToImplementation yield-posix.c)
 set(SingleCoreOnlyImplementation singlecoreonly-posix.c)
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
 if(PIKEOS)
   add_definitions(-DPIKEOS_POSIX_PSE52)
   add_definitions(-DPIKEOS_POSIX_SCHEDULER_HOOK=true) # Note that this requires a custom build of the PikeOS toolchain

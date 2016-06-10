@@ -2,6 +2,9 @@
 
 enum errorcode {
   noError=0,
+  threadAttributeError=3,
+  policyError=4,
+  preemptionHookRegistrationError=6,
   boostError=7,
   deboostError=8,
   fromAlreadySet=9,

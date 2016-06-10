@@ -49,8 +49,9 @@ void deboost() {
   if (setPriority(pthread_self(), Realtime_Priority)) error(deboostError, "deboost failed");
 }
 
-static int preempt_hook(unsigned cpu, pthread_t t_old, pthread_t t_new) {
-  UNUSED(cpu); UNUSED(t_old); UNUSED(t_new);
+static int preempt_hook(unsigned __attribute__((unused)) cpu,
+                        pthread_t t_old,
+                        pthread_t __attribute__((unused)) t_new) {
   printf("kernel invoked pre-emption hook in %s\n", getName(pthread_self()));
   if (t_old == from || t_old == to) {
     kernelWantsPreemption = true;
@@ -60,10 +61,8 @@ static int preempt_hook(unsigned cpu, pthread_t t_old, pthread_t t_new) {
 }
 
 void registerPreemptionHook() {
-  if (__set_sched_hook(SCHED_PREEMPT_HOOK, preempt_hook) == (__sched_hook_t *) - 1) {
-    printf("failed to register pre-emption hook\n");
-    exit(6);
-  }
+  if (__set_sched_hook(SCHED_PREEMPT_HOOK, preempt_hook) == (__sched_hook_t *) - 1)
+    error(preemptionHookRegistrationError, "failed to register pre-emption hook");
   printf("registered pre-emption hook\n");
 }
 

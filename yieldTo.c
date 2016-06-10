@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <pthread.h>
-#include <stdlib.h>
 #include <stdbool.h>
 
 #include "yieldTo.h"
@@ -55,8 +54,7 @@ static void checkedYieldTo() {
   yieldedTo = false;
 }
 
-static void *toLogic(void *ignored) {
-  UNUSED(ignored);
+static void *toLogic(void *  __attribute__((unused)) ignored) {
   setToId();
   waitAtBarrier();
   sched_yield();
@@ -79,12 +77,7 @@ static void *toLogic(void *ignored) {
   return NULL;
 }
 
-static void startToThread() {
-  pthread_create(&to, NULL, &toLogic, NULL);
-}
-
-static void *busy(void *ignored) {
-  UNUSED(ignored);
+static void *busy(void * __attribute__((unused)) ignored) {
   for (int i = 0; i < Yield_Count && !toFinished; i++)
     for (unsigned long k = 0; k < Loops_Between_Yields && !toFinished; k++) {
       if (yieldedTo) fail(yieldToFail, "yieldTo failed, in background thread.");
@@ -100,19 +93,10 @@ static void startBackgroundThreads() {
   printf("creating %i background threads...", Background_Thread_Number);
 #if Scheduling_Policy == SCHED_FIFO || Scheduling_Policy == SCHED_RR
   pthread_attr_t attr;
-  if (pthread_attr_init(&attr) != 0) {
-    printf("thread attr init failure");
-    exit(3);
-  }
-  if (pthread_attr_setschedpolicy(&attr, Scheduling_Policy)) {
-    printf("could not set realtime policy\n");
-    exit(4);
-  }
+  if (pthread_attr_init(&attr)) error(threadAttributeError, "failed to initialize thread attributes");
+  if (pthread_attr_setschedpolicy(&attr, Scheduling_Policy)) error(policyError, "failed to set scheduling policy");
   struct sched_param param = {.sched_priority = Realtime_Priority};
-  if (pthread_attr_setschedparam(&attr, &param)) {
-    printf("could not set realtime priority\n");
-    exit(4);
-  }
+  if (pthread_attr_setschedparam(&attr, &param)) error(prioritySetFailed, "failed to set realtime priority");
   for (int i = 0; i < Background_Thread_Number; i++)
     pthread_create(&tid[i], &attr, &busy, NULL);
   pthread_attr_destroy(&attr);
@@ -124,7 +108,7 @@ static void startBackgroundThreads() {
 }
 
 static void startThreads() {
-  startToThread();
+  pthread_create(&to, NULL, &toLogic, NULL);
   startBackgroundThreads();
 }
 
@@ -142,10 +126,8 @@ static void setRealtimeParameters(pthread_t thread) {
 #if Scheduling_Policy == SCHED_FIFO || Scheduling_Policy == SCHED_RR
   printf("setting realtime parameters\n");
   struct sched_param param = {.sched_priority = Realtime_Priority};
-  if (pthread_setschedparam(thread, Scheduling_Policy, &param)) {
-    printf("could not set realtime parameters\n");
-    exit(5);
-  }
+  if (pthread_setschedparam(thread, Scheduling_Policy, &param))
+    error(prioritySetFailed, "failed to set realtime parameters");
   printRRSchedulingInfo();
 #endif
 }
