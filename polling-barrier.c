@@ -3,6 +3,8 @@
 
 #include "barrier.h"
 
+// This is a very primitive barrier for this test setup. It is needed for PikeOS, which does not support POSIX barriers.
+
 static volatile bool barrierReached = false;
 static volatile bool firstWaiting = false;
 

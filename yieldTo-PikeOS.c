@@ -24,11 +24,11 @@ static volatile pthread_t back;
 void marker(){} // not implemented
 
 void setFromId() {
-  // Todo: Implement
+  back = pthread_self();
 }
 
 void setToId() {
-  // Todo: Implement
+  to = pthread_self();
 }
 
 // Todo: use this

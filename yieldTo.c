@@ -24,7 +24,8 @@ static void setupResources();
 static void startThreads();
 static void joinThreads();
 
-void main(int argc, char *argv[]) {
+int main(int argc, char *argv[]) {
+  printf("launching yieldTo\n");
   setupResources();
   startThreads();
   registerPreemptionHook();

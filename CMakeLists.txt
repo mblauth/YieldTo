@@ -7,7 +7,9 @@ set(BarrierImplementation pthread-barrier.c)
 set(YieldToImplementation yield-posix.c)
 set(SingleCoreOnlyImplementation singlecoreonly-posix.c)
 if(PIKEOS)
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DPIKEOS_POSIX_PSE52 -DPIKEOS_POSIX_SCHEDULER_HOOK=true -fno-builtin -fno-unit-at-a-time -nostdinc -fno-strict-aliasing -msoft-float")
+  add_definitions(-DPIKEOS_POSIX_PSE52)
+  add_definitions(-DPIKEOS_POSIX_SCHEDULER_HOOK=true) # Note that this requires a custom build of the PikeOS toolchain
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-builtin -fno-unit-at-a-time -nostdinc -fno-strict-aliasing -msoft-float -O0")
   set(CMAKE_FIND_ROOT_PATH "${PIKEOS_ROOT}")
   set(POSIXLIBS ${CMAKE_FIND_ROOT_PATH}/target/ppc/e500/bposix/lib/)
   set(CMAKE_C_COMPILER ${CMAKE_FIND_ROOT_PATH}/cdk/ppc/e500/bin/ppc_e500-gcc)
@@ -54,7 +56,14 @@ add_definitions(-D_GNU_SOURCE)
 add_executable(YieldTo yieldTo.c ${BarrierImplementation} ${YieldToImplementation} ${SingleCoreOnlyImplementation})
 
 if(PIKEOS)
-  set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -T${CMAKE_FIND_ROOT_PATH}/target/ppc/e500/scripts/app-ld-script ${CMAKE_FIND_ROOT_PATH}/target/ppc/e500/bposix/os/up/crt0.o ${POSIXLIBS}/pse52.o ${POSIXLIBS}/pse52_ext2fs.o ${POSIXLIBS}/pse52_ufs.o ${POSIXLIBS}/rootfs.a")
+  set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -T${CMAKE_FIND_ROOT_PATH}/target/ppc/e500/scripts/app-ld-script \
+    ${CMAKE_FIND_ROOT_PATH}/target/ppc/e500/bposix/os/up/crt0.o \
+    ${CMAKE_FIND_ROOT_PATH}/target/ppc/e500/bposix/os/up/h_scheduler.o \
+    ${POSIXLIBS}/pse52.o \
+    ${POSIXLIBS}/pse52_ext2fs.o \
+    ${POSIXLIBS}/pse52_provfs.o \
+    ${POSIXLIBS}/pse52_ufs.o \
+    ${POSIXLIBS}/rootfs.a")
   target_link_libraries(YieldTo c sbuf m vm p4 gcc stand)
   if(PIKEOS_TARGET)
     install(PROGRAMS ${CMAKE_BINARY_DIR}/YieldTo DESTINATION ${PIKEOS_TARGET} RENAME posix)
