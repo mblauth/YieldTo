@@ -6,7 +6,6 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <pthread.h>
-#include <stdlib.h>
 
 #include "yieldTo.h"
 #include "error.h"

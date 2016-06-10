@@ -21,9 +21,11 @@ static void setupResources();
 static void startThreads();
 static void joinThreads();
 static void checkedYieldTo();
+static void checkYieldBack();
+static void step();
 
 int main(int argc, char *argv[]) {
-  printf("launching yieldTo\n");
+  printf("launching yieldTo test\n");
   setupResources();
   startThreads();
   registerPreemptionHook();
@@ -32,25 +34,33 @@ int main(int argc, char *argv[]) {
   started = true;
   while (!toFinished) {
     checkedYieldTo();
-
-    if (yieldedBack) {
-      printf("yieldBack worked\n");
-      yieldedBack = false;
-      deboost();
-    } else fail(yieldBackFail, "yieldBack failed, status flag unchanged.");
-
-    for (unsigned long k = 0; k < Loops_Between_Yields && !toFinished; k++)
-      yieldedTo = false;
+    checkYieldBack();
+    for (unsigned long k = 0; k < Loops_Between_Yields; k++)
+      step();
   }
   joinThreads();
   destroyBarrier();
   printf("yieldTo test succeeded\n");
 }
 
+inline static void step() {
+  yieldedTo = false;
+  yieldedBack = false;
+}
+
+static void checkYieldBack() {
+  if (toFinished) return;
+  if (yieldedBack) {
+      printf("yieldBack worked\n");
+      yieldedBack = false;
+      deboost();
+    } else fail(yieldBackFail, "yieldBack failed, status flag unchanged.");
+}
+
 static void checkedYieldTo() {
   yieldedTo = true;
   yieldTo();  // resets yieldedTo to false
-  if (yieldedTo) fail(yieldToFail, "yieldTo failed, still in from.");
+  if (yieldedTo && !toFinished) fail(yieldToFail, "yieldTo failed, still in from.");
   yieldedTo = false;
 }
 
@@ -60,17 +70,15 @@ static void *toLogic(void *  __attribute__((unused)) ignored) {
   sched_yield();
   marker();
   for (int i = 0; i < Yield_Count; i++)
-    for (unsigned long k = 0; k < Loops_Between_Yields; k++) {
-      if (yieldedTo) {
-        printf("yieldTo worked!\n");
-        yieldedTo = false;
-        deboost();
+    if (yieldedTo) {
+      printf("yieldTo worked #%d of %d\n", i+1, Yield_Count);
+      yieldedTo = false;
+      deboost();
 
-        yieldedBack = true;
-        yieldBack();
-        if (yieldedBack) fail(yieldBackFail, "yieldBack failed, still in to.");
-        yieldedBack = false;
-      }
+      yieldedBack = true;
+      yieldBack();
+      if (yieldedBack) fail(yieldBackFail, "yieldBack failed, still in to.");
+      yieldedBack = false;
     }
   printf("yieldTo target finished execution\n");
   toFinished = true;
@@ -81,10 +89,9 @@ static void *busy(void * __attribute__((unused)) ignored) {
   for (int i = 0; i < Yield_Count && !toFinished; i++)
     for (unsigned long k = 0; k < Loops_Between_Yields && !toFinished; k++) {
       if (yieldedTo) fail(yieldToFail, "yieldTo failed, in background thread.");
-      yieldedTo = false;
       if (yieldedBack) fail(yieldBackFail, "yieldBack failed, in background thread.");
-      yieldedBack = false;
       if (Want_Starvation && started && !toFinished) fail(notStarved, "background thread was not starved.");
+      step();
     }
   return NULL;
 }
