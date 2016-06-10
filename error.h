@@ -13,7 +13,8 @@ enum errorcode {
 
 enum failcode {
   yieldToFail=100,
-  yieldBackFail=101
+  yieldBackFail=101,
+  notStarved=102
 };
 
 void error(enum errorcode code, const char * message);

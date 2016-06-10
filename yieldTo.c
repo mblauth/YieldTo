@@ -7,6 +7,7 @@
 #include "barrier.h"
 #include "config.h"
 #include "error.h"
+#include "posixhelpers.h"
 
 volatile bool yieldedTo = false;
 static volatile bool yieldedBack = false;
@@ -15,6 +16,7 @@ static pthread_t tid[Background_Thread_Number];
 static pthread_t to;
 
 static volatile bool toFinished = false;
+static volatile bool started = false;
 
 static void setupResources();
 static void startThreads();
@@ -28,9 +30,8 @@ int main(int argc, char *argv[]) {
   registerPreemptionHook();
   waitAtBarrier();
   marker();
+  started = true;
   while (!toFinished) {
-    for (unsigned long k = 0; k < 0xffffff && !toFinished; k++)
-      yieldedTo = false;
     checkedYieldTo();
 
     if (yieldedBack) {
@@ -38,9 +39,13 @@ int main(int argc, char *argv[]) {
       yieldedBack = false;
       deboost();
     } else fail(yieldBackFail, "yieldBack failed, status flag unchanged.");
+
+    for (unsigned long k = 0; k < Loops_Between_Yields && !toFinished; k++)
+      yieldedTo = false;
   }
   joinThreads();
   destroyBarrier();
+  printf("yieldTo test succeeded\n");
 }
 
 static void checkedYieldTo() {
@@ -56,8 +61,8 @@ static void *toLogic(void *ignored) {
   waitAtBarrier();
   sched_yield();
   marker();
-  for (int i = 0; i < Load_Factor; i++)
-    for (unsigned long k = 0; k < 0xffffff; k++) {
+  for (int i = 0; i < Yield_Count; i++)
+    for (unsigned long k = 0; k < Loops_Between_Yields; k++) {
       if (yieldedTo) {
         printf("yieldTo worked!\n");
         yieldedTo = false;
@@ -80,12 +85,13 @@ static void startToThread() {
 
 static void *busy(void *ignored) {
   UNUSED(ignored);
-  for (int i = 0; i < Load_Factor; i++)
-    for (unsigned long k = 0; k < 0xffffff; k++) {
+  for (int i = 0; i < Yield_Count && !toFinished; i++)
+    for (unsigned long k = 0; k < Loops_Between_Yields && !toFinished; k++) {
       if (yieldedTo) fail(yieldToFail, "yieldTo failed, in background thread.");
       yieldedTo = false;
       if (yieldedBack) fail(yieldBackFail, "yieldBack failed, in background thread.");
       yieldedBack = false;
+      if (Want_Starvation && started && !toFinished) fail(notStarved, "background thread was not starved.");
     }
   return NULL;
 }
@@ -140,11 +146,7 @@ static void setRealtimeParameters(pthread_t thread) {
     printf("could not set realtime parameters\n");
     exit(5);
   }
-#if defined(_POSIX_PRIORITY_SCHEDULING) && Scheduling_Policy == SCHED_RR
-  struct timespec interval;
-  sched_rr_get_interval(0, &interval);
-  printf("RR interval: %ld s %ld ns\n", interval.tv_sec, interval.tv_nsec);
-#endif
+  printRRSchedulingInfo();
 #endif
 }
 
