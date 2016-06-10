@@ -9,11 +9,11 @@
 #include "error.h"
 
 volatile bool yieldedTo = false;
+static volatile bool yieldedBack = false;
 
 static pthread_t tid[Background_Thread_Number];
 static pthread_t to;
 
-static volatile bool yieldedBack = false;
 static volatile bool toFinished = false;
 
 static void setupResources();
@@ -33,13 +33,11 @@ int main(int argc, char *argv[]) {
       yieldedTo = false;
     checkedYieldTo();
 
-#if YieldBack
     if (yieldedBack) {
       printf("yieldBack worked\n");
       yieldedBack = false;
       deboost();
     } else printf("yieldBack failed\n");
-#endif
   }
   joinThreads();
   destroyBarrier();
@@ -65,12 +63,10 @@ static void *toLogic(void *ignored) {
         yieldedTo = false;
         deboost();
 
-#if YieldBack
         yieldedBack = true;
         yieldBack();
         if (yieldedBack) printf("yieldBack failed!\n");
         yieldedBack = false;
-#endif
       }
     }
   printf("yieldTo target finished execution\n");
@@ -88,10 +84,8 @@ static void *busy(void *ignored) {
     for (unsigned long k = 0; k < 0xffffff; k++) {
       if (yieldedTo) printf("yieldTo failed\n");
       yieldedTo = false;
-#if YieldBack
       if (yieldedBack) printf("yieldBack failed\n");
       yieldedBack = false;
-#endif
     }
   return NULL;
 }
