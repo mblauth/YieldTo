@@ -90,7 +90,7 @@ void fail(enum failcode code, enum failThread thread) {
   exit(code);
 }
 
-void debug(int level, char *format, ...) {
+void debug(int level, const char * format, ...) {
   if (Debug_Output && level <= Debug_Level) {
     va_list args;
     va_start(args, format);
@@ -99,7 +99,7 @@ void debug(int level, char *format, ...) {
   }
 }
 
-void status(char* message) {
+void status(const char * message) {
   printf("\n*** %s ***\n\n", message);
 }
 

@@ -48,6 +48,6 @@ enum logEvent {
 
 void error(enum errorcode);
 void fail(enum failcode, enum failThread);
-void debug(int level, char*, ...);
-void status(char*);
+void debug(int level, const char *, ...);
+void status(const char *);
 void log(enum logEvent);

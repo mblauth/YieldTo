@@ -34,27 +34,29 @@ void setToId() {
   debug(3, "'to' is %p\n", to);
 }
 
-static char* getName(pthread_t thread) {
+static const char const * getName(pthread_t thread) {
   if (thread == to) return "to";
   if (thread == from) return "from";
   return "unknown";
 }
 
-bool boosted(pthread_t thread) {
+static const char const * selfName() { return getName(pthread_self()); }
+
+static bool boosted(pthread_t thread) {
   return getPriority(thread) == Realtime_Priority + 1;
 }
 
-bool deboosted(pthread_t thread) {
+static bool deboosted(pthread_t thread) {
   return getPriority(thread) == Realtime_Priority;
 }
 
-void deboost() {
+static void deboost() {
   pthread_t self = pthread_self();
   if (deboosted(self)) {
     debug(2, "handling last yieldBack\n");
     return;
   }
-  debug(1, "deboosting '%s'...", getName(self));
+  debug(1, "deboosting '%s'...", selfName());
   if (setPriority(self, Realtime_Priority)) error(deboostError); // should never yield according to POSIX
   debug(1, "done\n");
   if (!deboosted(self)) error(deboostError);
@@ -68,7 +70,7 @@ static int preempt_hook(unsigned __attribute__((unused)) cpu,
     return true; // allow pre-emption
   }
   if (t_old == from || t_old == to) {
-    debug(1, "kernel invoked pre-emption hook in '%s'\n", getName(pthread_self()));
+    debug(1, "kernel invoked pre-emption hook in '%s'\n", selfName());
     kernelWantsPreemption = true;
     return false; // block pre-emption
   }
@@ -89,16 +91,15 @@ static pthread_t next() {
   return self;
 }
 
-void returningFromYield() {
-  pthread_t self = pthread_self();
-  debug(1, "'%s' returning\n", getName(self));
+static void returningFromYield() {
+  debug(1, "'%s' returning\n", selfName());
   yielding = false;
   deboost();
 }
 
 static void boost(pthread_t thread) {
   pthread_t self = pthread_self();
-  debug(1, "'%s' boosting '%s'\n", getName(self), getName(thread));
+  debug(1, "'%s' boosting '%s'\n", selfName(), getName(thread));
   if (!deboosted(self)) error(mustDeboostSelf);
   if (boosted(thread)) error(alreadyBoosted);
 
@@ -115,14 +116,14 @@ static void boost(pthread_t thread) {
 
 static inline void yield(pthread_t thread) {
   pthread_t self = pthread_self();
-  debug(1, "'%s' wants to yield to '%s'\n", getName(self), getName(next()));
+  debug(1, "'%s' wants to yield to '%s'\n", selfName(), getName(next()));
   if (yielding) error(alreadyYielding);
   if (!deboosted(self)) error(yieldBeforeDeboost);
   if (self == thread) error(yieldToSelf);
   boost(thread);
   if (kernelWantsPreemption) { // need to revert kernel boost in case it forced the pre-emption
     kernelWantsPreemption = false;
-    debug(1, "'%s' re-allows pre-emption\n", getName(self));
+    debug(1, "'%s' re-allows pre-emption\n", selfName());
     yielding = true;
     __revert_sched_boost(self);
     // by this point we should have went through one yieldTo/back-cycle and hence be boosted
@@ -138,28 +139,27 @@ inline void yieldBack() {
   yield(from);
 }
 
+
+static volatile bool * syncFlagForSelf() {
+  return pthread_self() == to ? &inSync.to : &inSync.from;
+}
+
+static void preemptInSyncpoint() {
+  volatile bool * syncFlag = syncFlagForSelf();
+  if(*syncFlag) error(alreadyInSyncpoint);
+  *syncFlag = true;
+  debug(1, "forced yield in '%s'\n", selfName());
+  yield(next());
+  debug(1, "'%s' returning in syncpoint\n", selfName());
+  *syncFlag = false;
+}
+
+
 inline void syncPoint() {
   if (yielding) { // Todo: only really needed for first yieldTo, not in the greatest spot here
     debug(2, "handling first yieldTo\n");
     yielding = false;
     deboost();
   }
-
-  if (kernelWantsPreemption) {
-    if (pthread_self() == from) {
-      if (fromInSync) error(alreadyInSyncpoint);
-      fromInSync = true;
-      debug(1, "forced yield in 'from'\n");
-      yieldTo();
-      debug(1, "'from' returning in syncpoint\n");
-      fromInSync = false;
-    } else {
-      if (toInSync) error(alreadyInSyncpoint);
-      toInSync = true;
-      debug(1, "forced yield in 'to'\n");
-      yieldBack();
-      debug(1, "'to' returning in syncpoint\n");
-      toInSync = false;
-    }
-  }
+  if (kernelWantsPreemption) preemptInSyncpoint();
 }

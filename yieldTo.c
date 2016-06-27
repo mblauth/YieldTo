@@ -8,8 +8,7 @@
 #include "error.h"
 #include "posixhelpers.h"
 
-volatile bool fromInSync = false;
-volatile bool toInSync = false;
+struct inSync inSync = { false, false };
 
 static volatile bool yieldedTo = false;
 static volatile bool yieldedBack = false;
@@ -82,9 +81,9 @@ static void checkYieldBack() {
     log(yieldBackEvent);
     yieldedBack = false;
   }
-  else if (toInSync) {
+  else if (inSync.to) {
     log(toPreemptionEvent);
-    toInSync = false;
+    inSync.to = false;
   }
 }
 
@@ -93,14 +92,14 @@ static void checkYieldTo() {
     log(yieldToEvent);
     yieldedTo = false;
   }
-  else if (fromInSync) {
+  else if (inSync.from) {
     log(fromPreemptionEvent);
-    fromInSync = false;
+    inSync.from = false;
   }
 }
 
 static void checkedYieldTo() {
-  if (fromInSync) error(inSyncpoint);
+  if (inSync.from) error(inSyncpoint);
   yieldedTo = true;
   yieldTo();  // resets yieldedTo to false in to thread
   if (yieldedTo && !toFinished) fail(yieldToFail, fromThread);
@@ -108,7 +107,7 @@ static void checkedYieldTo() {
 }
 
 static void checkedYieldBack() {
-  if (toInSync) error(inSyncpoint);
+  if (inSync.to) error(inSyncpoint);
   yieldedBack = true;
   yieldBack();
   if (yieldedBack) fail(yieldBackFail, toThread);

@@ -3,10 +3,12 @@
 #include <pthread.h>
 #include <stdbool.h>
 
-volatile bool fromInSync;
-volatile bool toInSync;
+struct inSync {
+  volatile bool from;
+  volatile bool to;
+};
+struct inSync inSync;
 
-void deboost(); // optional
 void marker(); // optional
 void registerPreemptionHook(); // optional
 void setFromId();
