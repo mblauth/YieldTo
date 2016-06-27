@@ -12,6 +12,14 @@ enum errorcode setPriority(pthread_t thread, int priority) {
   return noError;
 }
 
+int getPriority(pthread_t thread) {
+  int unused;
+  struct sched_param param;
+  if (pthread_getschedparam(thread, &unused, &param))
+    error(priorityGetFailed);
+  return param.sched_priority;
+}
+
 void printRRSchedulingInfo() {
 #if defined(_POSIX_PRIORITY_SCHEDULING) && Scheduling_Policy == SCHED_RR
   struct timespec interval;

@@ -8,7 +8,8 @@
 #include "error.h"
 #include "posixhelpers.h"
 
-volatile bool yieldedTo = false;
+volatile bool inSync = false;
+static volatile bool yieldedTo = false;
 static volatile bool yieldedBack = false;
 
 static pthread_t tid[Background_Thread_Number];
@@ -25,22 +26,25 @@ static void checkYieldBack();
 static void step();
 
 int main(int argc, char *argv[]) {
-  printf("launching yieldTo test\n");
+  status("launching yieldTo test");
   setupResources();
   startThreads();
-  registerPreemptionHook();
+  status("test setup finished");
   waitAtBarrier();
+  registerPreemptionHook();
   marker();
   started = true;
   while (!toFinished) {
     checkedYieldTo();
     checkYieldBack();
-    for (unsigned long k = 0; k < Loops_Between_Yields; k++)
+    for (unsigned long k = 0; k < Loops_Between_Yields; k++) {
       step();
+      syncPoint();
+    }
   }
   joinThreads();
   destroyBarrier();
-  printf("yieldTo test succeeded\n");
+  status("yieldTo test succeeded");
 }
 
 inline static void step() {
@@ -50,17 +54,20 @@ inline static void step() {
 
 static void checkYieldBack() {
   if (toFinished) return;
-  if (yieldedBack) {
-      printf("yieldBack worked\n");
-      yieldedBack = false;
-      deboost();
-    } else fail(yieldBackFail, "yieldBack failed, status flag unchanged.");
+  if (inSync) {
+    printf("successful in-sync pre-emption\n");
+    yieldedBack = false;
+    inSync = false;
+  } else if (yieldedBack) {
+    printf("yieldBack worked\n");
+    yieldedBack = false;
+  } else fail(yieldBackFail, fromThread);
 }
 
 static void checkedYieldTo() {
   yieldedTo = true;
-  yieldTo();  // resets yieldedTo to false
-  if (yieldedTo && !toFinished) fail(yieldToFail, "yieldTo failed, still in from.");
+  yieldTo();  // resets yieldedTo to false in to thread
+  if (yieldedTo && !toFinished) fail(yieldToFail, fromThread);
   yieldedTo = false;
 }
 
@@ -73,11 +80,15 @@ static void *toLogic(void *  __attribute__((unused)) ignored) {
     if (yieldedTo) {
       printf("yieldTo worked #%d of %d\n", i+1, Yield_Count);
       yieldedTo = false;
-      deboost();
+
+      for (unsigned long k = 0; k < Loops_Between_Yields; k++) {
+        step();
+        syncPoint();
+      }
 
       yieldedBack = true;
       yieldBack();
-      if (yieldedBack) fail(yieldBackFail, "yieldBack failed, still in to.");
+      if (yieldedBack) fail(yieldBackFail, toThread);
       yieldedBack = false;
     }
   printf("yieldTo target finished execution\n");
@@ -85,12 +96,12 @@ static void *toLogic(void *  __attribute__((unused)) ignored) {
   return NULL;
 }
 
-static void *busy(void * __attribute__((unused)) ignored) {
+static void *backgroundLogic(void *__attribute__((unused)) ignored) {
   for (int i = 0; i < Yield_Count && !toFinished; i++)
     for (unsigned long k = 0; k < Loops_Between_Yields && !toFinished; k++) {
-      if (yieldedTo) fail(yieldToFail, "yieldTo failed, in background thread.");
-      if (yieldedBack) fail(yieldBackFail, "yieldBack failed, in background thread.");
-      if (Want_Starvation && started && !toFinished) fail(notStarved, "background thread was not starved.");
+      if (yieldedTo) fail(yieldToFail, backgroundThread);
+      if (yieldedBack) fail(yieldBackFail, backgroundThread);
+      if (Want_Starvation && started && !toFinished) fail(notStarved, backgroundThread);
       step();
     }
   return NULL;
@@ -100,12 +111,12 @@ static void startBackgroundThreads() {
   printf("creating %i background threads...", Background_Thread_Number);
 #if Scheduling_Policy == SCHED_FIFO || Scheduling_Policy == SCHED_RR
   pthread_attr_t attr;
-  if (pthread_attr_init(&attr)) error(threadAttributeError, "failed to initialize thread attributes");
-  if (pthread_attr_setschedpolicy(&attr, Scheduling_Policy)) error(policyError, "failed to set scheduling policy");
+  if (pthread_attr_init(&attr)) error(threadAttributeError);
+  if (pthread_attr_setschedpolicy(&attr, Scheduling_Policy)) error(policyError);
   struct sched_param param = {.sched_priority = Realtime_Priority};
-  if (pthread_attr_setschedparam(&attr, &param)) error(prioritySetFailed, "failed to set realtime priority");
+  if (pthread_attr_setschedparam(&attr, &param)) error(prioritySetFailed);
   for (int i = 0; i < Background_Thread_Number; i++)
-    pthread_create(&tid[i], &attr, &busy, NULL);
+    pthread_create(&tid[i], &attr, &backgroundLogic, NULL);
   pthread_attr_destroy(&attr);
 #else
   for (int i = 0; i < Background_Thread_Number; i++)
@@ -131,10 +142,10 @@ static void joinThreads() {
 
 static void setRealtimeParameters(pthread_t thread) {
 #if Scheduling_Policy == SCHED_FIFO || Scheduling_Policy == SCHED_RR
-  printf("setting realtime parameters\n");
+  printf("setting realtime parameters policy: %d, priority: %d\n", Scheduling_Policy, Realtime_Priority);
   struct sched_param param = {.sched_priority = Realtime_Priority};
   if (pthread_setschedparam(thread, Scheduling_Policy, &param))
-    error(prioritySetFailed, "failed to set realtime parameters");
+    error(prioritySetFailed);
   printRRSchedulingInfo();
 #endif
 }

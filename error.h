@@ -10,8 +10,18 @@ enum errorcode {
   fromAlreadySet=9,
   toAlreadySet=10,
   fromAndToTheSame=11,
-  yieldToSelfError=13,
-  prioritySetFailed=14
+  yieldToSelf=13,
+  prioritySetFailed=14,
+  unknownThread=15,
+  alreadyInSyncpoint=16,
+  priorityGetFailed=17,
+  alreadyDeboosted=18,
+  alreadyBoosted=19,
+  mustDeboostSelf=20,
+  yieldBeforeDeboost=21,
+  notDeboosted=22,
+  stillBoosted=23,
+  alreadyYielding=24
 };
 
 enum failcode {
@@ -20,5 +30,13 @@ enum failcode {
   notStarved=102
 };
 
-void error(enum errorcode code, const char * message);
-void fail(enum failcode code, const char * message);
+enum failThread {
+  backgroundThread,
+  fromThread,
+  toThread
+};
+
+void error(enum errorcode);
+void fail(enum failcode, enum failThread);
+void debug(int level, char*, ...);
+void status(char*);
