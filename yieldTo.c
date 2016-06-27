@@ -13,12 +13,11 @@ volatile bool toInSync = false;
 
 static volatile bool yieldedTo = false;
 static volatile bool yieldedBack = false;
+static volatile bool toFinished = false;
+static volatile bool started = false;
 
 static pthread_t tid[Background_Thread_Number];
 static pthread_t to;
-
-static volatile bool toFinished = false;
-static volatile bool started = false;
 
 static void setupResources();
 static void startThreads();
@@ -26,6 +25,8 @@ static void joinThreads();
 static void checkedYieldTo();
 static void checkYieldBack();
 static void step();
+static void checkYieldTo();
+static void checkedYieldBack();
 
 int main(int argc, char *argv[]) {
   status("launching yieldTo test");
@@ -50,50 +51,6 @@ int main(int argc, char *argv[]) {
   status("yieldTo test succeeded");
 }
 
-inline static void step() {
-  yieldedTo = false;
-  yieldedBack = false;
-}
-
-static void checkYieldBack() {
-  if (toFinished) return;
-  else if (yieldedBack) {
-    log(yieldBackEvent);
-    yieldedBack = false;
-  }
-  else if (toInSync) {
-    log(toPreemptionEvent);
-    toInSync = false;
-  }
-}
-
-void checkYieldTo() {
-  if (yieldedTo) {
-    log(yieldToEvent);
-    yieldedTo = false;
-  }
-  else if (fromInSync) {
-    log(fromPreemptionEvent);
-    fromInSync = false;
-  }
-}
-
-static void checkedYieldTo() {
-  if (fromInSync) error(inSyncpoint);
-  yieldedTo = true;
-  yieldTo();  // resets yieldedTo to false in to thread
-  if (yieldedTo && !toFinished) fail(yieldToFail, fromThread);
-  yieldedTo = false;
-}
-
-void checkedYieldBack() {
-  if (toInSync) error(inSyncpoint);
-  yieldedBack = true;
-  yieldBack();
-  if (yieldedBack) fail(yieldBackFail, toThread);
-  yieldedBack = false;
-}
-
 static void *toLogic(void *  __attribute__((unused)) ignored) {
   setToId();
   waitAtBarrier();
@@ -113,6 +70,51 @@ static void *toLogic(void *  __attribute__((unused)) ignored) {
   status("yieldTo target finished execution");
   return NULL;
 }
+
+inline static void step() {
+  yieldedTo = false;
+  yieldedBack = false;
+}
+
+static void checkYieldBack() {
+  if (toFinished) return;
+  else if (yieldedBack) {
+    log(yieldBackEvent);
+    yieldedBack = false;
+  }
+  else if (toInSync) {
+    log(toPreemptionEvent);
+    toInSync = false;
+  }
+}
+
+static void checkYieldTo() {
+  if (yieldedTo) {
+    log(yieldToEvent);
+    yieldedTo = false;
+  }
+  else if (fromInSync) {
+    log(fromPreemptionEvent);
+    fromInSync = false;
+  }
+}
+
+static void checkedYieldTo() {
+  if (fromInSync) error(inSyncpoint);
+  yieldedTo = true;
+  yieldTo();  // resets yieldedTo to false in to thread
+  if (yieldedTo && !toFinished) fail(yieldToFail, fromThread);
+  yieldedTo = false;
+}
+
+static void checkedYieldBack() {
+  if (toInSync) error(inSyncpoint);
+  yieldedBack = true;
+  yieldBack();
+  if (yieldedBack) fail(yieldBackFail, toThread);
+  yieldedBack = false;
+}
+
 
 static void *backgroundLogic(void *__attribute__((unused)) ignored) {
   for (int i = 0; i < Yield_Count && !toFinished; i++)

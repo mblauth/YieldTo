@@ -10,12 +10,8 @@
 #include "yieldTo.h"
 #include "error.h"
 #include "posixhelpers.h"
+#include "config.h"
 
-#define Scheduling_Policy SCHED_RR
-#define Realtime_Priority 63
-
-
-// works via a preemption-notification, not a direct to
 static volatile bool kernelWantsPreemption = false;
 static volatile bool yielding = false;
 
@@ -59,7 +55,7 @@ void deboost() {
     return;
   }
   debug(1, "deboosting '%s'...", getName(self));
-  if (setPriority(self, Realtime_Priority)) error(deboostError); // should never yield
+  if (setPriority(self, Realtime_Priority)) error(deboostError); // should never yield according to POSIX
   debug(1, "done\n");
   if (!deboosted(self)) error(deboostError);
 }
@@ -69,7 +65,7 @@ static int preempt_hook(unsigned __attribute__((unused)) cpu,
                         pthread_t __attribute__((unused)) t_new) {
   if (yielding) {
     debug(2, "kernel saw intentional yield to '%s'\n", getName(t_new));
-    return true;
+    return true; // allow pre-emption
   }
   if (t_old == from || t_old == to) {
     debug(1, "kernel invoked pre-emption hook in '%s'\n", getName(pthread_self()));

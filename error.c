@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdarg.h>
+
 #include "error.h"
 #include "config.h"
 
@@ -102,6 +103,7 @@ void status(char* message) {
   printf("\n*** %s ***\n\n", message);
 }
 
+#if Log_Type == Simple_ascii_log
 void log(enum logEvent event) {
   switch (event) {
     case yieldToEvent:
@@ -119,3 +121,4 @@ void log(enum logEvent event) {
   }
   fflush(stdout);
 }
+#endif
