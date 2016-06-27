@@ -3,7 +3,8 @@
 #include <pthread.h>
 #include <stdbool.h>
 
-extern volatile bool inSync;
+volatile bool fromInSync;
+volatile bool toInSync;
 
 void deboost(); // optional
 void marker(); // optional

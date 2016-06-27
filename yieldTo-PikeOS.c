@@ -58,9 +58,9 @@ void deboost() {
     debug(2, "handling last yieldBack\n");
     return;
   }
-  printf("deboosting '%s'...", getName(self));
+  debug(1, "deboosting '%s'...", getName(self));
   if (setPriority(self, Realtime_Priority)) error(deboostError); // should never yield
-  printf("done\n");
+  debug(1, "done\n");
   if (!deboosted(self)) error(deboostError);
 }
 
@@ -72,7 +72,7 @@ static int preempt_hook(unsigned __attribute__((unused)) cpu,
     return true;
   }
   if (t_old == from || t_old == to) {
-    printf("kernel invoked pre-emption hook in '%s'\n", getName(pthread_self()));
+    debug(1, "kernel invoked pre-emption hook in '%s'\n", getName(pthread_self()));
     kernelWantsPreemption = true;
     return false; // block pre-emption
   }
@@ -82,7 +82,7 @@ static int preempt_hook(unsigned __attribute__((unused)) cpu,
 void registerPreemptionHook() {
   if (__set_sched_hook(SCHED_PREEMPT_HOOK, preempt_hook) == (__sched_hook_t *) - 1)
     error(preemptionHookRegistrationError);
-  printf("registered pre-emption hook\n");
+  debug(1, "registered pre-emption hook\n");
 }
 
 static pthread_t next() {
@@ -95,14 +95,14 @@ static pthread_t next() {
 
 void returningFromYield() {
   pthread_t self = pthread_self();
-  printf("'%s' returning\n", getName(self));
+  debug(1, "'%s' returning\n", getName(self));
   yielding = false;
   deboost();
 }
 
 static void boost(pthread_t thread) {
   pthread_t self = pthread_self();
-  printf("'%s' boosting '%s'\n", getName(self), getName(thread));
+  debug(1, "'%s' boosting '%s'\n", getName(self), getName(thread));
   if (!deboosted(self)) error(mustDeboostSelf);
   if (boosted(thread)) error(alreadyBoosted);
 
@@ -119,14 +119,14 @@ static void boost(pthread_t thread) {
 
 static inline void yield(pthread_t thread) {
   pthread_t self = pthread_self();
-  printf("'%s' wants to yield to '%s'\n", getName(self), getName(next()));
+  debug(1, "'%s' wants to yield to '%s'\n", getName(self), getName(next()));
   if (yielding) error(alreadyYielding);
   if (!deboosted(self)) error(yieldBeforeDeboost);
   if (self == thread) error(yieldToSelf);
   boost(thread);
   if (kernelWantsPreemption) { // need to revert kernel boost in case it forced the pre-emption
     kernelWantsPreemption = false;
-    printf("'%s' re-allows pre-emption\n", getName(self));
+    debug(1, "'%s' re-allows pre-emption\n", getName(self));
     yielding = true;
     __revert_sched_boost(self);
     // by this point we should have went through one yieldTo/back-cycle and hence be boosted
@@ -148,11 +148,22 @@ inline void syncPoint() {
     yielding = false;
     deboost();
   }
-  if (inSync) error(alreadyInSyncpoint);
-  inSync = true;
-  if (kernelWantsPreemption)  {
-    printf("forced yield in '%s'\n", getName(pthread_self()));
-    yield(next());
+
+  if (kernelWantsPreemption) {
+    if (pthread_self() == from) {
+      if (fromInSync) error(alreadyInSyncpoint);
+      fromInSync = true;
+      debug(1, "forced yield in 'from'\n");
+      yieldTo();
+      debug(1, "'from' returning in syncpoint\n");
+      fromInSync = false;
+    } else {
+      if (toInSync) error(alreadyInSyncpoint);
+      toInSync = true;
+      debug(1, "forced yield in 'to'\n");
+      yieldBack();
+      debug(1, "'to' returning in syncpoint\n");
+      toInSync = false;
+    }
   }
-  inSync = false;
 }

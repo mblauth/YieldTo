@@ -49,6 +49,8 @@ static char* errorStringFor(enum errorcode code) {
       return "other thread is still boosted";
     case alreadyYielding:
       return "already in a yield";
+    case inSyncpoint:
+      return "should not be in a syncpoint";
   }
   return "unknown error"; // should be unreachable
 }
@@ -98,4 +100,22 @@ void debug(int level, char *format, ...) {
 
 void status(char* message) {
   printf("\n*** %s ***\n\n", message);
+}
+
+void log(enum logEvent event) {
+  switch (event) {
+    case yieldToEvent:
+      printf(">"); break;
+    case yieldBackEvent:
+      printf("<"); break;
+    case toPreemptionEvent:
+      printf("+"); break;
+    case fromPreemptionEvent:
+      printf("-"); break;
+    case fromLoopFinishedEvent:
+      printf("]"); break;
+    case toLoopFinishedEvent:
+      printf(")"); break;
+  }
+  fflush(stdout);
 }

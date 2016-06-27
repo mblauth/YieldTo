@@ -21,7 +21,8 @@ enum errorcode {
   yieldBeforeDeboost=21,
   notDeboosted=22,
   stillBoosted=23,
-  alreadyYielding=24
+  alreadyYielding=24,
+  inSyncpoint=25
 };
 
 enum failcode {
@@ -36,7 +37,17 @@ enum failThread {
   toThread
 };
 
+enum logEvent {
+  yieldToEvent,
+  yieldBackEvent,
+  toPreemptionEvent,
+  fromPreemptionEvent,
+  toLoopFinishedEvent,
+  fromLoopFinishedEvent
+};
+
 void error(enum errorcode);
 void fail(enum failcode, enum failThread);
 void debug(int level, char*, ...);
 void status(char*);
+void log(enum logEvent);

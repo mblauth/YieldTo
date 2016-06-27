@@ -8,7 +8,9 @@
 #include "error.h"
 #include "posixhelpers.h"
 
-volatile bool inSync = false;
+volatile bool fromInSync = false;
+volatile bool toInSync = false;
+
 static volatile bool yieldedTo = false;
 static volatile bool yieldedBack = false;
 
@@ -36,11 +38,12 @@ int main(int argc, char *argv[]) {
   started = true;
   while (!toFinished) {
     checkedYieldTo();
-    checkYieldBack();
     for (unsigned long k = 0; k < Loops_Between_Yields; k++) {
       step();
       syncPoint();
+      checkYieldBack();
     }
+    log(fromLoopFinishedEvent);
   }
   joinThreads();
   destroyBarrier();
@@ -54,21 +57,41 @@ inline static void step() {
 
 static void checkYieldBack() {
   if (toFinished) return;
-  if (inSync) {
-    printf("successful in-sync pre-emption\n");
+  else if (yieldedBack) {
+    log(yieldBackEvent);
     yieldedBack = false;
-    inSync = false;
-  } else if (yieldedBack) {
-    printf("yieldBack worked\n");
-    yieldedBack = false;
-  } else fail(yieldBackFail, fromThread);
+  }
+  else if (toInSync) {
+    log(toPreemptionEvent);
+    toInSync = false;
+  }
+}
+
+void checkYieldTo() {
+  if (yieldedTo) {
+    log(yieldToEvent);
+    yieldedTo = false;
+  }
+  else if (fromInSync) {
+    log(fromPreemptionEvent);
+    fromInSync = false;
+  }
 }
 
 static void checkedYieldTo() {
+  if (fromInSync) error(inSyncpoint);
   yieldedTo = true;
   yieldTo();  // resets yieldedTo to false in to thread
   if (yieldedTo && !toFinished) fail(yieldToFail, fromThread);
   yieldedTo = false;
+}
+
+void checkedYieldBack() {
+  if (toInSync) error(inSyncpoint);
+  yieldedBack = true;
+  yieldBack();
+  if (yieldedBack) fail(yieldBackFail, toThread);
+  yieldedBack = false;
 }
 
 static void *toLogic(void *  __attribute__((unused)) ignored) {
@@ -76,23 +99,18 @@ static void *toLogic(void *  __attribute__((unused)) ignored) {
   waitAtBarrier();
   sched_yield();
   marker();
-  for (int i = 0; i < Yield_Count; i++)
-    if (yieldedTo) {
-      printf("yieldTo worked #%d of %d\n", i+1, Yield_Count);
-      yieldedTo = false;
-
-      for (unsigned long k = 0; k < Loops_Between_Yields; k++) {
-        step();
-        syncPoint();
-      }
-
-      yieldedBack = true;
-      yieldBack();
-      if (yieldedBack) fail(yieldBackFail, toThread);
-      yieldedBack = false;
+  for (int i = 0; i < Yield_Count; i++) {
+    for (unsigned long k = 0; k < Loops_Between_Yields; k++) {
+      step();
+      syncPoint();
+      checkYieldTo();
     }
-  printf("yieldTo target finished execution\n");
+    log(toLoopFinishedEvent);
+
+    checkedYieldBack();
+  }
   toFinished = true;
+  status("yieldTo target finished execution");
   return NULL;
 }
 

@@ -7,4 +7,4 @@
 #define Loops_Between_Yields 0xffffff
 #define Want_Starvation true
 #define Debug_Output true
-#define Debug_Level 1
+#define Debug_Level 0
