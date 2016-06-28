@@ -46,6 +46,15 @@ enum logEvent {
   fromLoopFinishedEvent
 };
 
+typedef struct directionalEvents_t {
+  enum logEvent finished;
+  enum logEvent incomingYield;
+  enum logEvent preemption;
+} directionalEvents;
+
+directionalEvents toEvents;
+directionalEvents fromEvents;
+
 void error(enum errorcode);
 void fail(enum failcode, enum failThread);
 void debug(int level, const char *, ...);

@@ -6,6 +6,19 @@
 #include "error.h"
 #include "config.h"
 
+
+directionalEvents toEvents = {
+    .finished=toLoopFinishedEvent,
+    .incomingYield=yieldToEvent,
+    .preemption=fromPreemptionEvent
+};
+
+directionalEvents fromEvents = {
+    .finished=fromLoopFinishedEvent,
+    .incomingYield=yieldBackEvent,
+    .preemption=toPreemptionEvent
+};
+
 static char* errorStringFor(enum errorcode code) {
   switch (code) {
     case boostError:

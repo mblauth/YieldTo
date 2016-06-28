@@ -16,7 +16,9 @@ enum yieldDirection {
 
 typedef struct activity_t {
   enum yieldDirection direction;
-  enum logEvent finishedEvent;
+  directionalEvents events;
+  volatile bool * yieldFlag;
+  volatile bool * otherInSyncpoint;
 } activity;
 
 static volatile bool yieldedTo = false;
@@ -33,14 +35,15 @@ static void *backgroundLogic(void*);
 
 static void startup();
 static void shutdown();
-static void runLoop(activity loopActivity) ;
-
-static void checkYield(enum yieldDirection direction) ;
+static void runLoop(activity);
+static void checkYield(activity);
 
 int main(int argc, char *argv[]) {
   startup();
   activity from = { .direction=from_To_to,
-                    .finishedEvent=fromLoopFinishedEvent };
+                    .events=fromEvents,
+                    .yieldFlag=&yieldedBack,
+                    .otherInSyncpoint=&inSync.to };
   while (!toFinished) {
     checkedYieldTo();
     runLoop(from);
@@ -54,7 +57,9 @@ static void *toLogic(void *  __attribute__((unused)) ignored) {
   sched_yield();
   marker();
   activity to = { .direction=To_to_from,
-                  .finishedEvent=toLoopFinishedEvent };
+                  .events=toEvents,
+                  .yieldFlag=&yieldedTo,
+                  .otherInSyncpoint=&inSync.from };
   for (int i = 0; i < Yield_Count; i++) {
     runLoop(to);
     checkedYieldBack();
@@ -68,9 +73,9 @@ static void runLoop(activity loopActivity) {
   for (unsigned long k = 0; k < Loops_Between_Yields; k++) {
     step();
     syncPoint();
-    checkYield(loopActivity.direction);
+    checkYield(loopActivity);
   }
-  log(loopActivity.finishedEvent);
+  log(loopActivity.events.finished);
 }
 
 static void shutdown() {
@@ -95,33 +100,17 @@ inline static void step() {
   yieldedBack = false;
 }
 
-static void checkYield(enum yieldDirection direction) {
-  if (direction == To_to_from && toFinished) return;
-
-  enum logEvent yieldEvent;
-  enum logEvent preemptionEvent;
-  volatile bool *yieldFlag;
-  volatile bool *syncFlag;
-
-  if (direction == from_To_to) {
-    yieldEvent = yieldBackEvent;
-    preemptionEvent = toPreemptionEvent;
-    yieldFlag = &yieldedBack;
-    syncFlag = &inSync.to;
-  } else {
-    yieldEvent = yieldToEvent;
-    preemptionEvent = fromPreemptionEvent;
-    yieldFlag = &yieldedTo;
-    syncFlag = &inSync.from;
+static void logAndUnsetIfSet(volatile bool * flag, enum logEvent event) {
+  if (*flag) {
+    log(event);
+    *flag=false;
   }
+}
 
-  if (*yieldFlag) {
-    log(yieldEvent);
-    *yieldFlag = false;
-  } else if (*syncFlag) {
-    log(preemptionEvent);
-    *syncFlag = false;
-  }
+static void checkYield(activity yieldActivity) {
+  if (yieldActivity.direction == To_to_from && toFinished) return;
+  logAndUnsetIfSet(yieldActivity.yieldFlag, yieldActivity.events.incomingYield);
+  logAndUnsetIfSet(yieldActivity.otherInSyncpoint, yieldActivity.events.preemption);
 }
 
 static void checkedYieldTo() {
