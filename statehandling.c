@@ -8,8 +8,7 @@ yieldState fromStateInternal = {
         .finished=fromLoopFinishedEvent,
         .incomingYield=yieldBackEvent,
         .preemption=toPreemptionEvent},
-    .incomingYield=false,
-    .otherInSyncpoint=false
+    .incomingYield=noYield
 };
 
 yieldState toStateInternal = {
@@ -17,8 +16,7 @@ yieldState toStateInternal = {
         .finished=toLoopFinishedEvent,
         .incomingYield=yieldToEvent,
         .preemption=fromPreemptionEvent},
-    .incomingYield=false,
-    .otherInSyncpoint=false
+    .incomingYield=noYield
 };
 
 void createFromState() {

@@ -140,20 +140,19 @@ inline void yieldBack() {
   yield(from);
 }
 
-
-static volatile bool * syncFlagForSelf() {
-  return (pthread_self() == to ? &fromState->otherInSyncpoint : &toState->otherInSyncpoint);
+static volatile yieldType * incomingYieldFlagForSelf() {
+  return (pthread_self() == to ? &fromState->incomingYield : &toState->incomingYield);
 }
 
 static void preemptInSyncpoint() {
   debug(2, "handling pre-emption in syncpoint");
-  volatile bool * inSyncpoint = syncFlagForSelf();
-  if(*inSyncpoint) error(alreadyInSyncpoint);
-  *inSyncpoint = true;
+  volatile yieldType * incomingYieldFlag = incomingYieldFlagForSelf();
+  if(*incomingYieldFlag == forcedYield) error(alreadyInSyncpoint);
+  *incomingYieldFlag = forcedYield;
   debug(1, "forced yield in '%s'\n", selfName());
   yield(next());
   debug(1, "'%s' returning in syncpoint\n", selfName());
-  *inSyncpoint = false;
+  *incomingYieldFlag = noYield;
 }
 
 

@@ -18,7 +18,6 @@ static void step();
 static void checkedYieldBack();
 static void *toLogic(void*);
 static void *backgroundLogic(void*);
-
 static void startup();
 static void shutdown();
 static void runLoop(yieldState*);
@@ -76,43 +75,38 @@ static void startup() {
 }
 
 inline static void step() {
-  fromState->incomingYield = false;
-  toState->incomingYield = false;
-}
-
-static void logAndUnsetIfSet(volatile bool * flag, enum logEvent event) {
-  if (*flag) {
-    log(event);
-    *flag=false;
-  }
+  fromState->incomingYield = noYield;
+  toState->incomingYield = noYield;
 }
 
 static void checkYield(yieldState * state) {
   if (state == toState && toFinished) return;
-  logAndUnsetIfSet(&state->incomingYield, state->logEvents.incomingYield);
-  logAndUnsetIfSet(&state->otherInSyncpoint, state->logEvents.preemption);
+  if (state->incomingYield == explicitYield)
+    log(state->logEvents.incomingYield);
+  else if (state->incomingYield == forcedYield)
+    log(state->logEvents.preemption);
+  state->incomingYield = noYield;
 }
 
 static void checkedYieldTo() {
-  if (fromState->otherInSyncpoint) error(inSyncpoint);
-  toState->incomingYield = true;
+  toState->incomingYield = explicitYield;
   yieldTo();
-  if (toState->incomingYield && !toFinished) fail(yieldToFail, fromThread);
-  toState->incomingYield = false;
+  if (toState->incomingYield == explicitYield && !toFinished) fail(yieldToFail, fromThread);
+  toState->incomingYield = noYield;
 }
 
 static void checkedYieldBack() {
-  if (toState->otherInSyncpoint) error(inSyncpoint);
-  fromState->incomingYield = true;
+  fromState->incomingYield = explicitYield;
   yieldBack();
-  if (fromState->incomingYield) fail(yieldBackFail, toThread);
+  if (fromState->incomingYield == explicitYield) fail(yieldBackFail, toThread);
+  fromState->incomingYield = noYield;
 }
 
 static void * backgroundLogic(void *__attribute__((unused)) ignored) {
   for (int i = 0; i < Yield_Count && !toFinished; i++)
     for (unsigned long k = 0; k < Loops_Between_Yields && !toFinished; k++) {
-      if (toState->incomingYield) fail(yieldToFail, backgroundThread);
-      if (fromState->incomingYield) fail(yieldBackFail, backgroundThread);
+      if (toState->incomingYield == explicitYield) fail(yieldToFail, backgroundThread);
+      if (fromState->incomingYield == explicitYield) fail(yieldBackFail, backgroundThread);
       if (Want_Starvation && started && !toFinished) fail(notStarved, backgroundThread);
       step();
     }
