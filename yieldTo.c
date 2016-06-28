@@ -10,6 +10,11 @@
 
 struct inSync inSync = { false, false };
 
+typedef struct activity_t {
+  void (*syncpointCheck)();
+  enum logEvent finishedEvent;
+} activity;
+
 static volatile bool yieldedTo = false;
 static volatile bool yieldedBack = false;
 static volatile bool toFinished = false;
@@ -24,7 +29,53 @@ static void checkedYieldBack();
 static void *toLogic(void*);
 static void *backgroundLogic(void*);
 
+static void startup();
+static void shutdown();
+static void runLoop(activity loopActivity) ;
+
 int main(int argc, char *argv[]) {
+  startup();
+  activity from = { .syncpointCheck=&checkYieldBack,
+                    .finishedEvent=fromLoopFinishedEvent };
+  while (!toFinished) {
+    checkedYieldTo();
+    runLoop(from);
+  }
+  shutdown();
+}
+
+static void *toLogic(void *  __attribute__((unused)) ignored) {
+  setToId();
+  waitAtBarrier();
+  sched_yield();
+  marker();
+  activity to = { .syncpointCheck=&checkYieldTo,
+                  .finishedEvent=toLoopFinishedEvent };
+  for (int i = 0; i < Yield_Count; i++) {
+    runLoop(to);
+    checkedYieldBack();
+  }
+  toFinished = true;
+  status("yieldTo target finished execution");
+  return NULL;
+}
+
+static void runLoop(activity loopActivity) {
+  for (unsigned long k = 0; k < Loops_Between_Yields; k++) {
+    step();
+    syncPoint();
+    loopActivity.syncpointCheck();
+  }
+  log(loopActivity.finishedEvent);
+}
+
+static void shutdown() {
+  joinThreads();
+  destroyBarrier();
+  status("yieldTo test succeeded");
+}
+
+static void startup() {
   status("launching yieldTo test");
   setupResources();
   startThreads(&toLogic, &backgroundLogic);
@@ -33,38 +84,6 @@ int main(int argc, char *argv[]) {
   registerPreemptionHook();
   marker();
   started = true;
-  while (!toFinished) {
-    checkedYieldTo();
-    for (unsigned long k = 0; k < Loops_Between_Yields; k++) {
-      step();
-      syncPoint();
-      checkYieldBack();
-    }
-    log(fromLoopFinishedEvent);
-  }
-  joinThreads();
-  destroyBarrier();
-  status("yieldTo test succeeded");
-}
-
-static void *toLogic(void *  __attribute__((unused)) ignored) {
-  setToId();
-  waitAtBarrier();
-  sched_yield();
-  marker();
-  for (int i = 0; i < Yield_Count; i++) {
-    for (unsigned long k = 0; k < Loops_Between_Yields; k++) {
-      step();
-      syncPoint();
-      checkYieldTo();
-    }
-    log(toLoopFinishedEvent);
-
-    checkedYieldBack();
-  }
-  toFinished = true;
-  status("yieldTo target finished execution");
-  return NULL;
 }
 
 inline static void step() {
@@ -77,8 +96,7 @@ static void checkYieldBack() {
   else if (yieldedBack) {
     log(yieldBackEvent);
     yieldedBack = false;
-  }
-  else if (inSync.to) {
+  } else if (inSync.to) {
     log(toPreemptionEvent);
     inSync.to = false;
   }
@@ -88,8 +106,7 @@ static void checkYieldTo() {
   if (yieldedTo) {
     log(yieldToEvent);
     yieldedTo = false;
-  }
-  else if (inSync.from) {
+  } else if (inSync.from) {
     log(fromPreemptionEvent);
     inSync.from = false;
   }
@@ -98,7 +115,7 @@ static void checkYieldTo() {
 static void checkedYieldTo() {
   if (inSync.from) error(inSyncpoint);
   yieldedTo = true;
-  yieldTo();  // resets yieldedTo to false in to thread
+  yieldTo();
   if (yieldedTo && !toFinished) fail(yieldToFail, fromThread);
   yieldedTo = false;
 }
