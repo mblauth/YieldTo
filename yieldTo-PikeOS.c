@@ -9,7 +9,7 @@
 
 #include "yieldTo.h"
 #include "error.h"
-#include "posixhelpers.h"
+#include "scheduling.h"
 #include "config.h"
 
 static volatile bool kernelWantsPreemption = false;

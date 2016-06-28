@@ -6,7 +6,7 @@
 #include "config.h"
 #include "error.h"
 #include "yieldTo.h"
-#include "posixhelpers.h"
+#include "scheduling.h"
 
 static volatile pthread_t to = NULL;
 static volatile pthread_t from = NULL;
