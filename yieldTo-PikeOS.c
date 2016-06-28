@@ -11,6 +11,7 @@
 #include "error.h"
 #include "scheduling.h"
 #include "config.h"
+#include "statehandling.h"
 
 static volatile bool kernelWantsPreemption = false;
 static volatile bool yielding = false;
@@ -141,17 +142,18 @@ inline void yieldBack() {
 
 
 static volatile bool * syncFlagForSelf() {
-  return pthread_self() == to ? &inSync.to : &inSync.from;
+  return (pthread_self() == to ? &fromState->otherInSyncpoint : &toState->otherInSyncpoint);
 }
 
 static void preemptInSyncpoint() {
-  volatile bool * syncFlag = syncFlagForSelf();
-  if(*syncFlag) error(alreadyInSyncpoint);
-  *syncFlag = true;
+  debug(2, "handling pre-emption in syncpoint");
+  volatile bool * inSyncpoint = syncFlagForSelf();
+  if(*inSyncpoint) error(alreadyInSyncpoint);
+  *inSyncpoint = true;
   debug(1, "forced yield in '%s'\n", selfName());
   yield(next());
   debug(1, "'%s' returning in syncpoint\n", selfName());
-  *syncFlag = false;
+  *inSyncpoint = false;
 }
 
 

@@ -7,22 +7,8 @@
 #include "error.h"
 #include "scheduling.h"
 #include "threadmanagement.h"
+#include "statehandling.h"
 
-struct inSync inSync = { false, false };
-
-enum yieldDirection {
-  from_To_to, To_to_from
-};
-
-typedef struct activity_t {
-  enum yieldDirection direction;
-  directionalEvents events;
-  volatile bool * yieldFlag;
-  volatile bool * otherInSyncpoint;
-} activity;
-
-static volatile bool yieldedTo = false;
-static volatile bool yieldedBack = false;
 static volatile bool toFinished = false;
 static volatile bool started = false;
 
@@ -35,18 +21,14 @@ static void *backgroundLogic(void*);
 
 static void startup();
 static void shutdown();
-static void runLoop(activity);
-static void checkYield(activity);
+static void runLoop(yieldState*);
+static void checkYield(yieldState*);
 
 int main(int argc, char *argv[]) {
   startup();
-  activity from = { .direction=from_To_to,
-                    .events=fromEvents,
-                    .yieldFlag=&yieldedBack,
-                    .otherInSyncpoint=&inSync.to };
   while (!toFinished) {
     checkedYieldTo();
-    runLoop(from);
+    runLoop(fromState);
   }
   shutdown();
 }
@@ -56,12 +38,8 @@ static void *toLogic(void *  __attribute__((unused)) ignored) {
   waitAtBarrier();
   sched_yield();
   marker();
-  activity to = { .direction=To_to_from,
-                  .events=toEvents,
-                  .yieldFlag=&yieldedTo,
-                  .otherInSyncpoint=&inSync.from };
   for (int i = 0; i < Yield_Count; i++) {
-    runLoop(to);
+    runLoop(toState);
     checkedYieldBack();
   }
   toFinished = true;
@@ -69,13 +47,13 @@ static void *toLogic(void *  __attribute__((unused)) ignored) {
   return NULL;
 }
 
-static void runLoop(activity loopActivity) {
+static void runLoop(yieldState * state) {
   for (unsigned long k = 0; k < Loops_Between_Yields; k++) {
     step();
     syncPoint();
-    checkYield(loopActivity);
+    checkYield(state);
   }
-  log(loopActivity.events.finished);
+  log(state->logEvents.finished);
 }
 
 static void shutdown() {
@@ -86,18 +64,20 @@ static void shutdown() {
 
 static void startup() {
   status("launching yieldTo test");
+  createFromState();
+  createToState();
   setupResources();
   startThreads(&toLogic, &backgroundLogic);
-  status("test setup finished");
   waitAtBarrier();
   registerPreemptionHook();
   marker();
+  status("test setup finished");
   started = true;
 }
 
 inline static void step() {
-  yieldedTo = false;
-  yieldedBack = false;
+  fromState->incomingYield = false;
+  toState->incomingYield = false;
 }
 
 static void logAndUnsetIfSet(volatile bool * flag, enum logEvent event) {
@@ -107,33 +87,32 @@ static void logAndUnsetIfSet(volatile bool * flag, enum logEvent event) {
   }
 }
 
-static void checkYield(activity yieldActivity) {
-  if (yieldActivity.direction == To_to_from && toFinished) return;
-  logAndUnsetIfSet(yieldActivity.yieldFlag, yieldActivity.events.incomingYield);
-  logAndUnsetIfSet(yieldActivity.otherInSyncpoint, yieldActivity.events.preemption);
+static void checkYield(yieldState * state) {
+  if (state->direction == To_to_from && toFinished) return;
+  logAndUnsetIfSet(&state->incomingYield, state->logEvents.incomingYield);
+  logAndUnsetIfSet(&state->otherInSyncpoint, state->logEvents.preemption);
 }
 
 static void checkedYieldTo() {
-  if (inSync.from) error(inSyncpoint);
-  yieldedTo = true;
+  if (fromState->otherInSyncpoint) error(inSyncpoint);
+  toState->incomingYield = true;
   yieldTo();
-  if (yieldedTo && !toFinished) fail(yieldToFail, fromThread);
-  yieldedTo = false;
+  if (toState->incomingYield && !toFinished) fail(yieldToFail, fromThread);
+  toState->incomingYield = false;
 }
 
 static void checkedYieldBack() {
-  if (inSync.to) error(inSyncpoint);
-  yieldedBack = true;
+  if (toState->otherInSyncpoint) error(inSyncpoint);
+  fromState->incomingYield = true;
   yieldBack();
-  if (yieldedBack) fail(yieldBackFail, toThread);
-  yieldedBack = false;
+  if (fromState->incomingYield) fail(yieldBackFail, toThread);
 }
 
-static void *backgroundLogic(void *__attribute__((unused)) ignored) {
+static void * backgroundLogic(void *__attribute__((unused)) ignored) {
   for (int i = 0; i < Yield_Count && !toFinished; i++)
     for (unsigned long k = 0; k < Loops_Between_Yields && !toFinished; k++) {
-      if (yieldedTo) fail(yieldToFail, backgroundThread);
-      if (yieldedBack) fail(yieldBackFail, backgroundThread);
+      if (toState->incomingYield) fail(yieldToFail, backgroundThread);
+      if (fromState->incomingYield) fail(yieldBackFail, backgroundThread);
       if (Want_Starvation && started && !toFinished) fail(notStarved, backgroundThread);
       step();
     }
