@@ -88,7 +88,7 @@ static void logAndUnsetIfSet(volatile bool * flag, enum logEvent event) {
 }
 
 static void checkYield(yieldState * state) {
-  if (state->direction == To_to_from && toFinished) return;
+  if (state == toState && toFinished) return;
   logAndUnsetIfSet(&state->incomingYield, state->logEvents.incomingYield);
   logAndUnsetIfSet(&state->otherInSyncpoint, state->logEvents.preemption);
 }

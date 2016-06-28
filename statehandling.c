@@ -4,7 +4,6 @@
 #include "statehandling.h"
 
 yieldState fromStateInternal = {
-    .direction=from_To_to,
     .logEvents={
         .finished=fromLoopFinishedEvent,
         .incomingYield=yieldBackEvent,
@@ -14,7 +13,6 @@ yieldState fromStateInternal = {
 };
 
 yieldState toStateInternal = {
-    .direction=To_to_from,
     .logEvents={
         .finished=toLoopFinishedEvent,
         .incomingYield=yieldToEvent,
