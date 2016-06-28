@@ -13,9 +13,8 @@ static volatile bool toFinished = false;
 static volatile bool started = false;
 
 static void setupResources();
-static void checkedYieldTo();
+static void checkedYieldTo(yieldState*,yieldState*);
 static void step();
-static void checkedYieldBack();
 static void *toLogic(void*);
 static void *backgroundLogic(void*);
 static void startup();
@@ -26,7 +25,7 @@ static void checkYield(yieldState*);
 int main(int argc, char *argv[]) {
   startup();
   while (!toFinished) {
-    checkedYieldTo();
+    checkedYieldTo(fromState, toState);
     runLoop(fromState);
   }
   shutdown();
@@ -39,7 +38,7 @@ static void *toLogic(void *  __attribute__((unused)) ignored) {
   marker();
   for (int i = 0; i < Yield_Count; i++) {
     runLoop(toState);
-    checkedYieldBack();
+    checkedYieldTo(toState, fromState);
   }
   toFinished = true;
   status("yieldTo target finished execution");
@@ -88,18 +87,11 @@ static void checkYield(yieldState * state) {
   state->incomingYield = noYield;
 }
 
-static void checkedYieldTo() {
+static void checkedYieldTo(yieldState * fromState, yieldState * toState) {
   toState->incomingYield = explicitYield;
-  yieldTo();
-  if (toState->incomingYield == explicitYield && !toFinished) fail(yieldToFail, fromThread);
+  fromState->yieldTo();
+  if (toState->incomingYield == explicitYield && !toFinished) fail(yieldToFail, fromState->thread);
   toState->incomingYield = noYield;
-}
-
-static void checkedYieldBack() {
-  fromState->incomingYield = explicitYield;
-  yieldBack();
-  if (fromState->incomingYield == explicitYield) fail(yieldBackFail, toThread);
-  fromState->incomingYield = noYield;
 }
 
 static void * backgroundLogic(void *__attribute__((unused)) ignored) {
@@ -112,7 +104,6 @@ static void * backgroundLogic(void *__attribute__((unused)) ignored) {
     }
   return NULL;
 }
-
 
 static void setupResources() {
   singleCoreOnly();

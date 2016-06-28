@@ -12,6 +12,8 @@ typedef volatile enum yieldType_t {
 typedef struct yieldState_t {
   const directionalEvents logEvents;
   yieldType incomingYield;
+  void (*yieldTo)();
+  enum threadType thread;
 } yieldState;
 
 void createFromState();

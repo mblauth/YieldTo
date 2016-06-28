@@ -2,13 +2,16 @@
 #include <string.h>
 #include "error.h"
 #include "statehandling.h"
+#include "yieldTo.h"
 
 yieldState fromStateInternal = {
     .logEvents={
         .finished=fromLoopFinishedEvent,
         .incomingYield=yieldBackEvent,
         .preemption=toPreemptionEvent},
-    .incomingYield=noYield
+    .incomingYield=noYield,
+    .yieldTo=&yieldTo,
+    .thread=fromThread
 };
 
 yieldState toStateInternal = {
@@ -16,7 +19,9 @@ yieldState toStateInternal = {
         .finished=toLoopFinishedEvent,
         .incomingYield=yieldToEvent,
         .preemption=fromPreemptionEvent},
-    .incomingYield=noYield
+    .incomingYield=noYield,
+    .yieldTo=&yieldBack,
+    .thread=toThread
 };
 
 void createFromState() {

@@ -73,7 +73,7 @@ static char* failureStringFor(enum failcode code) {
   return "unkown failure"; // should be unreachable
 }
 
-static char* failThreadToString(enum failThread thread) {
+static char* failThreadToString(enum threadType thread) {
   switch (thread) {
     case backgroundThread:
       return "background thread";
@@ -85,7 +85,7 @@ static char* failThreadToString(enum failThread thread) {
   return "unkown thread"; // should be unreachable
 }
 
-void fail(enum failcode code, enum failThread thread) {
+void fail(enum failcode code, enum threadType thread) {
   printf("%s, currently in %s\n", failureStringFor(code), failThreadToString(thread));
   exit(code);
 }

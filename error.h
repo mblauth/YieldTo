@@ -31,7 +31,7 @@ enum failcode {
   notStarved=102
 };
 
-enum failThread {
+enum threadType {
   backgroundThread,
   fromThread,
   toThread
@@ -53,7 +53,7 @@ typedef struct directionalEvents_t {
 } directionalEvents;
 
 void error(enum errorcode);
-void fail(enum failcode, enum failThread);
+void fail(enum failcode, enum threadType);
 void debug(int level, const char *, ...);
 void status(const char *);
 void log(enum logEvent);
