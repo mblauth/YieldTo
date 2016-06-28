@@ -10,8 +10,12 @@
 
 struct inSync inSync = { false, false };
 
+enum yieldDirection {
+  from_To_to, To_to_from
+};
+
 typedef struct activity_t {
-  void (*syncpointCheck)();
+  enum yieldDirection direction;
   enum logEvent finishedEvent;
 } activity;
 
@@ -22,9 +26,7 @@ static volatile bool started = false;
 
 static void setupResources();
 static void checkedYieldTo();
-static void checkYieldBack();
 static void step();
-static void checkYieldTo();
 static void checkedYieldBack();
 static void *toLogic(void*);
 static void *backgroundLogic(void*);
@@ -33,9 +35,11 @@ static void startup();
 static void shutdown();
 static void runLoop(activity loopActivity) ;
 
+static void checkYield(enum yieldDirection direction) ;
+
 int main(int argc, char *argv[]) {
   startup();
-  activity from = { .syncpointCheck=&checkYieldBack,
+  activity from = { .direction=from_To_to,
                     .finishedEvent=fromLoopFinishedEvent };
   while (!toFinished) {
     checkedYieldTo();
@@ -49,7 +53,7 @@ static void *toLogic(void *  __attribute__((unused)) ignored) {
   waitAtBarrier();
   sched_yield();
   marker();
-  activity to = { .syncpointCheck=&checkYieldTo,
+  activity to = { .direction=To_to_from,
                   .finishedEvent=toLoopFinishedEvent };
   for (int i = 0; i < Yield_Count; i++) {
     runLoop(to);
@@ -64,7 +68,7 @@ static void runLoop(activity loopActivity) {
   for (unsigned long k = 0; k < Loops_Between_Yields; k++) {
     step();
     syncPoint();
-    loopActivity.syncpointCheck();
+    checkYield(loopActivity.direction);
   }
   log(loopActivity.finishedEvent);
 }
@@ -91,24 +95,32 @@ inline static void step() {
   yieldedBack = false;
 }
 
-static void checkYieldBack() {
-  if (toFinished) return;
-  else if (yieldedBack) {
-    log(yieldBackEvent);
-    yieldedBack = false;
-  } else if (inSync.to) {
-    log(toPreemptionEvent);
-    inSync.to = false;
-  }
-}
+static void checkYield(enum yieldDirection direction) {
+  if (direction == To_to_from && toFinished) return;
 
-static void checkYieldTo() {
-  if (yieldedTo) {
-    log(yieldToEvent);
-    yieldedTo = false;
-  } else if (inSync.from) {
-    log(fromPreemptionEvent);
-    inSync.from = false;
+  enum logEvent yieldEvent;
+  enum logEvent preemptionEvent;
+  volatile bool *yieldFlag;
+  volatile bool *syncFlag;
+
+  if (direction == from_To_to) {
+    yieldEvent = yieldBackEvent;
+    preemptionEvent = toPreemptionEvent;
+    yieldFlag = &yieldedBack;
+    syncFlag = &inSync.to;
+  } else {
+    yieldEvent = yieldToEvent;
+    preemptionEvent = fromPreemptionEvent;
+    yieldFlag = &yieldedTo;
+    syncFlag = &inSync.from;
+  }
+
+  if (*yieldFlag) {
+    log(yieldEvent);
+    *yieldFlag = false;
+  } else if (*syncFlag) {
+    log(preemptionEvent);
+    *syncFlag = false;
   }
 }
 
