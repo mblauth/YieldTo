@@ -9,6 +9,7 @@
 
 #include "yieldTo.h"
 #include "error.h"
+#include "log.h"
 #include "scheduling.h"
 #include "config.h"
 #include "statehandling.h"
@@ -133,13 +134,8 @@ static inline void yield(pthread_t thread) {
   }
 }
 
-inline void yieldTo() {
-  yield(to);
-}
-
-inline void yieldBack() {
-  yield(from);
-}
+inline void yieldTo() { yield(to); }
+inline void yieldBack() { yield(from); }
 
 static volatile yieldType * incomingYieldFlagForSelf() {
   return (pthread_self() == to ? &fromState->incomingYield : &toState->incomingYield);

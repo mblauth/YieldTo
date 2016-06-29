@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdarg.h>
+#include <limits.h>
 
 #include "error.h"
 #include "config.h"
@@ -103,39 +104,4 @@ void debug(int level, const char * format, ...) {
 
 void status(const char * message) {
   printf("\n*** %s ***\n\n", message);
-}
-
-static void benchmarkLog(enum logEvent event) {
-  // Todo: implement
-}
-
-static void simpleAsciiLog(enum logEvent event) {
-  switch (event) {
-    case yieldToEvent:
-      printf(">"); break;
-    case yieldBackEvent:
-      printf("<"); break;
-    case toPreemptionEvent:
-      printf("+"); break;
-    case fromPreemptionEvent:
-      printf("-"); break;
-    case fromLoopFinishedEvent:
-      printf("]"); break;
-    case toLoopFinishedEvent:
-      printf(")"); break;
-    case preemptRequest:
-      printf("~"); break;
-  }
-  fflush(stdout);
-}
-
-void log(enum logEvent event) {
-  switch (Log_Type) {
-    case simple_ascii_log:
-      return simpleAsciiLog(event);
-    case benchmark_log:
-      return benchmarkLog(event);
-    default:
-      error(invalidLogType);
-  }
 }

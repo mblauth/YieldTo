@@ -5,6 +5,7 @@
 #include "barrier.h"
 #include "config.h"
 #include "error.h"
+#include "log.h"
 #include "scheduling.h"
 #include "threadmanagement.h"
 #include "statehandling.h"

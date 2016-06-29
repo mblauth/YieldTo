@@ -1,6 +1,8 @@
 #include <stdlib.h>
 #include <string.h>
+
 #include "error.h"
+#include "log.h"
 #include "statehandling.h"
 #include "yieldTo.h"
 

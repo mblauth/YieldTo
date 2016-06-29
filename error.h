@@ -38,29 +38,7 @@ enum threadType {
   toThread
 };
 
-enum logEvent {
-  yieldToEvent,
-  yieldBackEvent,
-  toPreemptionEvent,
-  fromPreemptionEvent,
-  toLoopFinishedEvent,
-  fromLoopFinishedEvent,
-  preemptRequest
-};
-
-enum logType {
-  simple_ascii_log,
-  benchmark_log
-};
-
-typedef struct directionalEvents_t {
-  const enum logEvent finished;
-  const enum logEvent incomingYield;
-  const enum logEvent preemption;
-} directionalEvents;
-
 void error(enum errorcode);
 void fail(enum failcode, enum threadType);
 void debug(int level, const char *, ...);
 void status(const char *);
-void log(enum logEvent);
