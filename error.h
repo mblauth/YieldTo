@@ -22,7 +22,8 @@ enum errorcode {
   notDeboosted=22,
   stillBoosted=23,
   alreadyYielding=24,
-  inSyncpoint=25
+  inSyncpoint=25,
+  invalidLogType=26
 };
 
 enum failcode {
@@ -43,7 +44,13 @@ enum logEvent {
   toPreemptionEvent,
   fromPreemptionEvent,
   toLoopFinishedEvent,
-  fromLoopFinishedEvent
+  fromLoopFinishedEvent,
+  preemptRequest
+};
+
+enum logType {
+  simple_ascii_log,
+  benchmark_log
 };
 
 typedef struct directionalEvents_t {

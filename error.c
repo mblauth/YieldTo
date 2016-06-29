@@ -52,6 +52,8 @@ static char* errorStringFor(enum errorcode code) {
       return "already in a yield";
     case inSyncpoint:
       return "should not be in a syncpoint";
+    case invalidLogType:
+      return "should not be in a syncpoint";
   }
   return "unknown error"; // should be unreachable
 }
@@ -103,8 +105,11 @@ void status(const char * message) {
   printf("\n*** %s ***\n\n", message);
 }
 
-#if Log_Type == Simple_ascii_log
-void log(enum logEvent event) {
+static void benchmarkLog(enum logEvent event) {
+  // Todo: implement
+}
+
+static void simpleAsciiLog(enum logEvent event) {
   switch (event) {
     case yieldToEvent:
       printf(">"); break;
@@ -118,7 +123,19 @@ void log(enum logEvent event) {
       printf("]"); break;
     case toLoopFinishedEvent:
       printf(")"); break;
+    case preemptRequest:
+      printf("~"); break;
   }
   fflush(stdout);
 }
-#endif
+
+void log(enum logEvent event) {
+  switch (Log_Type) {
+    case simple_ascii_log:
+      return simpleAsciiLog(event);
+    case benchmark_log:
+      return benchmarkLog(event);
+    default:
+      error(invalidLogType);
+  }
+}

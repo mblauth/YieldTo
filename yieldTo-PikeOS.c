@@ -72,6 +72,7 @@ static int preempt_hook(unsigned __attribute__((unused)) cpu,
   }
   if (t_old == from || t_old == to) {
     debug(1, "kernel invoked pre-emption hook in '%s'\n", selfName());
+    log(preemptRequest);
     kernelWantsPreemption = true;
     return false; // block pre-emption
   }

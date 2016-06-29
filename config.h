@@ -8,4 +8,4 @@
 #define Want_Starvation true
 #define Debug_Output true
 #define Debug_Level 0
-#define Log_Type Simple_ascii_log
+#define Log_Type simple_ascii_log
