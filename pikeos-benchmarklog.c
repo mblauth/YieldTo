@@ -1,23 +1,24 @@
 #include <limits.h>
 #include <sys/timespec.h>
-#include <time.h>
 #include <stdio.h>
 #include <ddapi/ddapi.h>
 
 #include "log.h"
 
-static volatile long minTimeMus = LONG_MAX;
-static volatile long maxTimeMus = 0;
+static volatile uint64_t minTimeMus = LONG_MAX;
+static volatile uint64_t maxTimeMus = 0;
 
-static volatile long startTimeMus;
+static volatile uint64_t startTimeMus;
+
+static uint64_t getTimeInMus() { return (dd_get_time_raw() / 1000); }
 
 static void handlePreemptRequest() {
-  startTimeMus = (volatile long) (dd_get_time_raw() / 1000); // PikeOS-specific
+  startTimeMus = getTimeInMus(); // PikeOS-specific
 }
 
-void handlePreemptionEvent() {
-  long endTimeMus = (volatile long) (dd_get_time_raw() / 1000);
-  long musDiff = endTimeMus - startTimeMus;
+static void handlePreemptionEvent() {
+  uint64_t endTimeMus = getTimeInMus();
+  uint64_t musDiff = endTimeMus - startTimeMus;
   if (minTimeMus > musDiff) minTimeMus = musDiff;
   if (maxTimeMus < musDiff) maxTimeMus = musDiff;
 }
@@ -30,9 +31,9 @@ void log(enum logEvent event) {
     case toPreemptionEvent:
       return handlePreemptionEvent();
     case toLoopFinishedEvent:
-      printf("Max: %ld, Min: %ld\n", maxTimeMus, minTimeMus);
+      printf("Max: %llu, Min: %llu\n", maxTimeMus, minTimeMus);
       maxTimeMus = 0;
-      minTimeMus = LONG_MAX;
+      minTimeMus = UINT64_MAX;
       return;
     default: ; // ignore other events
   }
