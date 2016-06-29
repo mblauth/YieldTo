@@ -6,6 +6,7 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR})
 set(BarrierImplementation pthread-barrier.c)
 set(YieldToImplementation yield-posix.c)
 set(SingleCoreOnlyImplementation singlecoreonly-posix.c)
+set(LogImplementation simpleasciilog.c)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
 if(PIKEOS)
   add_definitions(-DPIKEOS_POSIX_PSE52)
@@ -22,8 +23,8 @@ if(PIKEOS)
   link_directories(SYSTEM ${CMAKE_FIND_ROOT_PATH}/target/ppc/e500/lib
                    SYSTEM ${CMAKE_FIND_ROOT_PATH}/target/ppc/e500/bposix/os/up)
   set(BarrierImplementation polling-barrier.c) # not so POSIX…
-  set(YieldToImplementation yieldTo-PikeOS.c)
-  #set(YieldToImplementation boost-posix.c)
+  set(YieldToImplementation yieldTo-PikeOS.c) # boost-posix.c is also supported
+  set(LogImplementation pikeos-benchmarklog.c)
 elseif(QNX)
   set(QNX_TARGET $ENV{QNX_TARGET})
   if(NOT EXISTS ${QNX_TARGET})
@@ -44,7 +45,7 @@ elseif(QNX)
   set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
   include_directories(SYSTEM ${CMAKE_FIND_ROOT_PATH})
   link_directories(SYSTEM ${POSIXLIBS})
-  set(BarrierImplementation pthread-barrier.c) # not so POSIX…
+  set(BarrierImplementation pthread-barrier.c)
   set(YieldToImplementation yieldTo-qnx.c)
   unset(SingleCoreOnlyImplementation)
 elseif(${CMAKE_SYSTEM} MATCHES "Linux")
@@ -55,7 +56,8 @@ endif()
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99") # PikeOS toolchain does not support c11
 add_definitions(-D_GNU_SOURCE)
 
-add_executable(YieldTo yieldTo.c error.c statehandling.c threadmanagement.c posix-scheduling.c simpleasciilog.c ${BarrierImplementation} ${YieldToImplementation} ${SingleCoreOnlyImplementation})
+add_executable(YieldTo yieldTo.c error.c statehandling.c threadmanagement.c posix-scheduling.c ${LogImplementation}
+                       ${BarrierImplementation} ${YieldToImplementation} ${SingleCoreOnlyImplementation})
 
 if(PIKEOS)
   set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -T${CMAKE_FIND_ROOT_PATH}/target/ppc/e500/scripts/app-ld-script \
