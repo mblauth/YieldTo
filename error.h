@@ -18,7 +18,6 @@ enum errorcode {
   priorityAlreadySet=18,
   alreadyBoosted=19,
   mustDeboostSelf=20,
-  yieldBeforeDeboost=21,
   alreadyYielding=24,
   invalidLogType=26
 };

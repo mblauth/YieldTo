@@ -94,7 +94,9 @@ static pthread_t next() {
   return self;
 }
 
+// This function always yields. It will yield with “yielding” set to true.
 static void wrapYield(void (*yieldFunc)(pthread_t), pthread_t thread) {
+  if (yielding) error(alreadyYielding);
   yielding = true;
   yieldFunc(thread); // go through one yieldTo/yieldBack cycle
   if (yielding && !boosted(pthread_self())) error(boostError); // the other thread should have boosted us or exited
@@ -105,10 +107,10 @@ static void wrapYield(void (*yieldFunc)(pthread_t), pthread_t thread) {
 
 static void boost(pthread_t thread) {
   pthread_t self = pthread_self();
-  debug(1, "'%s' boosting '%s'\n", selfName(), getName(thread));
   if (!deboosted(self)) error(mustDeboostSelf);
   if (boosted(thread)) error(alreadyBoosted);
 
+  debug(1, "'%s' boosting '%s'\n", selfName(), getName(thread));
   if (!kernelWantsPreemption) {
     wrapYield(&setBoostPriority, thread);
   } else {
@@ -120,11 +122,9 @@ static void boost(pthread_t thread) {
 static inline void yield(pthread_t thread) {
   pthread_t self = pthread_self();
   debug(1, "'%s' wants to yield to '%s'\n", selfName(), getName(next()));
-  if (yielding) error(alreadyYielding);
-  if (!deboosted(self)) error(yieldBeforeDeboost);
   if (self == thread) error(yieldToSelf);
-  boost(thread);
-  if (kernelWantsPreemption) { // need to revert kernel boost in case it forced the pre-emption
+  boost(thread); // yields if not kernel-boosted
+  if (kernelWantsPreemption) { // need to revert kernel boost in case it wants a pre-emption
     kernelWantsPreemption = false;
     debug(1, "'%s' re-allows pre-emption\n", selfName());
     wrapYield(&__revert_sched_boost, self);
@@ -140,13 +140,13 @@ static volatile yieldType * incomingYieldFlagForSelf() {
 
 static void preemptInSyncpoint() {
   debug(2, "handling pre-emption in syncpoint");
-  volatile yieldType * incomingYieldFlag = incomingYieldFlagForSelf();
-  if(*incomingYieldFlag == forcedYield) error(alreadyInSyncpoint);
-  *incomingYieldFlag = forcedYield;
+  volatile yieldType * incomingYield = incomingYieldFlagForSelf();
+  if(*incomingYield == forcedYield) error(alreadyInSyncpoint);
+  *incomingYield = forcedYield;
   debug(1, "forced yield in '%s'\n", selfName());
   yield(next());
   debug(1, "'%s' returning in syncpoint\n", selfName());
-  *incomingYieldFlag = noYield;
+  *incomingYield = noYield;
 }
 
 

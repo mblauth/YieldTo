@@ -43,8 +43,6 @@ static char* errorStringFor(enum errorcode code) {
       return "thread is already boosted";
     case mustDeboostSelf:
       return "thread must deboost itself before boosting another thread";
-    case yieldBeforeDeboost:
-      return "tried to yield before deboosting self";
     case alreadyYielding:
       return "already in a yield";
     case invalidLogType:
