@@ -37,22 +37,16 @@ static char* errorStringFor(enum errorcode code) {
       return "failed to set realtime priority";
     case priorityGetFailed:
       return "failed to set realtime priority";
-    case alreadyDeboosted:
-      return "thread is already deboosted";
+    case priorityAlreadySet:
+      return "priority already set";
     case alreadyBoosted:
       return "thread is already boosted";
     case mustDeboostSelf:
       return "thread must deboost itself before boosting another thread";
     case yieldBeforeDeboost:
       return "tried to yield before deboosting self";
-    case notDeboosted:
-      return "we were not deboosted";
-    case stillBoosted:
-      return "other thread is still boosted";
     case alreadyYielding:
       return "already in a yield";
-    case inSyncpoint:
-      return "should not be in a syncpoint";
     case invalidLogType:
       return "should not be in a syncpoint";
   }

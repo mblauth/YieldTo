@@ -59,7 +59,7 @@ static void deboost() {
     return;
   }
   debug(1, "deboosting '%s'...", selfName());
-  if (setPriority(self, Realtime_Priority)) error(deboostError); // should never yield according to POSIX
+  setRegularPriority(self); // should never yield according to POSIX
   debug(1, "done\n");
   if (!deboosted(self)) error(deboostError);
 }
@@ -94,9 +94,12 @@ static pthread_t next() {
   return self;
 }
 
-static void returningFromYield() {
-  debug(1, "'%s' returning\n", selfName());
+static void wrapYield(void (*yieldFunc)(pthread_t), pthread_t thread) {
+  yielding = true;
+  yieldFunc(thread); // go through one yieldTo/yieldBack cycle
+  if (yielding && !boosted(pthread_self())) error(boostError); // the other thread should have boosted us or exited
   yielding = false;
+  debug(1, "'%s' returning\n", selfName());
   deboost();
 }
 
@@ -107,13 +110,10 @@ static void boost(pthread_t thread) {
   if (boosted(thread)) error(alreadyBoosted);
 
   if (!kernelWantsPreemption) {
-    yielding = true;
-    if (setPriority(thread, Realtime_Priority + 1)) error(boostError);
-    // by this point we should have went through one yieldTo/back-cycle and hence be boosted
-    returningFromYield();
+    wrapYield(&setBoostPriority, thread);
   } else {
     debug(2, "non-yielding boost\n");
-    if (setPriority(thread, Realtime_Priority + 1)) error(boostError); // not yielding due to kernel boost
+    setBoostPriority(thread); // not yielding due to kernel boost
   }
 }
 
@@ -127,10 +127,7 @@ static inline void yield(pthread_t thread) {
   if (kernelWantsPreemption) { // need to revert kernel boost in case it forced the pre-emption
     kernelWantsPreemption = false;
     debug(1, "'%s' re-allows pre-emption\n", selfName());
-    yielding = true;
-    __revert_sched_boost(self);
-    // by this point we should have went through one yieldTo/back-cycle and hence be boosted
-    returningFromYield();
+    wrapYield(&__revert_sched_boost, self);
   }
 }
 

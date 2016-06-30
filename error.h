@@ -15,14 +15,11 @@ enum errorcode {
   unknownThread=15,
   alreadyInSyncpoint=16,
   priorityGetFailed=17,
-  alreadyDeboosted=18,
+  priorityAlreadySet=18,
   alreadyBoosted=19,
   mustDeboostSelf=20,
   yieldBeforeDeboost=21,
-  notDeboosted=22,
-  stillBoosted=23,
   alreadyYielding=24,
-  inSyncpoint=25,
   invalidLogType=26
 };
 

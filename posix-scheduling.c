@@ -6,10 +6,21 @@
 #include "error.h"
 #include "scheduling.h"
 
-enum errorcode setPriority(pthread_t thread, int priority) {
+static enum errorcode setPriority(pthread_t thread, int priority) {
+  if (getPriority(thread) == priority) error(priorityAlreadySet);
   if (pthread_setschedprio(thread, priority) != 0)
     return prioritySetFailed;
   return noError;
+}
+
+void setBoostPriority(pthread_t thread) {
+  enum errorcode errorcode = setPriority(thread, Realtime_Priority + 1);
+  if (errorcode != noError) error(errorcode);
+}
+
+void setRegularPriority(pthread_t thread) {
+  enum errorcode errorcode = setPriority(thread, Realtime_Priority);
+  if (errorcode != noError) error(errorcode);
 }
 
 int getPriority(pthread_t thread) {
