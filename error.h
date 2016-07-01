@@ -1,7 +1,7 @@
 #pragma once
 
+// hardcoded errorcodes for systems without stdout
 enum errorcode {
-  noError=0,
   threadAttributeError=3,
   policyError=4,
   preemptionHookRegistrationError=6,
@@ -18,8 +18,16 @@ enum errorcode {
   priorityAlreadySet=18,
   alreadyBoosted=19,
   mustDeboostSelf=20,
+  unexpectedReturn=21,
+  invalidBoostScenario=22,
+  notInSyncpoint=23,
   alreadyYielding=24,
-  invalidLogType=26
+  alreadyDeboosted=25,
+  invalidLogType=26,
+  unexpectedState=27,
+  stateUnchanged=28,
+  forcedExplicitTransition=29,
+  explicitForcedTransition=30
 };
 
 enum failcode {
@@ -37,4 +45,4 @@ enum threadType {
 void error(enum errorcode);
 void fail(enum failcode, enum threadType);
 void debug(int level, const char *, ...);
-void status(const char *);
+void status(char const *);

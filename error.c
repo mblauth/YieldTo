@@ -27,8 +27,6 @@ static char* errorStringFor(enum errorcode code) {
       return "to is already set";
     case fromAndToTheSame:
       return "from and to are the same";
-    case noError:
-      return "no error";
     case threadAttributeError:
       return "failed to initialize thread attributes";
     case policyError:
@@ -43,10 +41,26 @@ static char* errorStringFor(enum errorcode code) {
       return "thread is already boosted";
     case mustDeboostSelf:
       return "thread must deboost itself before boosting another thread";
+    case unexpectedReturn:
+      return "unexpected return to thread";
+    case invalidBoostScenario:
+      return "invalid boost scenario";
+    case notInSyncpoint:
+      return "not in syncpoint";
     case alreadyYielding:
       return "already in a yield";
+    case alreadyDeboosted:
+      return "already deboosted";
     case invalidLogType:
       return "should not be in a syncpoint";
+    case unexpectedState:
+      return "unexpected state";
+    case stateUnchanged:
+      return "state unchanged";
+    case forcedExplicitTransition:
+      return "direct transition from forced to explicit yield";
+    case explicitForcedTransition:
+      return "direct transition from explicit to forced yield";
   }
   return "unknown error"; // should be unreachable
 }
@@ -94,6 +108,6 @@ void debug(int level, const char * format, ...) {
   }
 }
 
-void status(const char * message) {
+void status(char const * message) {
   printf("\n*** %s ***\n\n", message);
 }

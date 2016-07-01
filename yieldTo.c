@@ -32,6 +32,10 @@ int main(int argc, char *argv[]) {
   shutdown();
 }
 
+bool toIsFinished() {
+  return toFinished;
+}
+
 static void *toLogic(void *  __attribute__((unused)) ignored) {
   setToId();
   waitAtBarrier();

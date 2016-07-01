@@ -11,3 +11,4 @@ void singleCoreOnly();
 void syncPoint();
 void yieldBack();
 void yieldTo();
+bool toIsFinished();
