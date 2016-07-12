@@ -27,7 +27,8 @@ enum errorcode {
   unexpectedState=27,
   stateUnchanged=28,
   forcedExplicitTransition=29,
-  explicitForcedTransition=30
+  explicitForcedTransition=30,
+  yieldFailed=31
 };
 
 enum failcode {

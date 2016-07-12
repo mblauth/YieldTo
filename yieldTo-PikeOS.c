@@ -5,6 +5,7 @@
 #include <sys/sched_hook.h>
 #include <stdbool.h>
 #include <pthread.h>
+#include <stdio.h>
 
 #include "yieldTo.h"
 #include "error.h"
@@ -12,9 +13,13 @@
 #include "scheduling.h"
 #include "config.h"
 #include "statehandling.h"
+#include "pikeos-state.h"
 
-static volatile yieldType state;
-static volatile bool pendingPreemption;
+
+/*
+ * Intentional Yielding: T1(noYield, explicitYield) -y-> T2(explicitYield, noYield)
+ * Preemption: T1 -> K(noYield, pendingPreemption) -> T1(pendingPreemption, explicitYield) -y-> T2(explicitYield, noYield)
+ */
 
 void marker(){} // not implemented
 void setFromId() { registerFrom(pthread_self()); }
@@ -28,27 +33,9 @@ static void deboost() {
   if (!deboosted(self)) error(deboostError);
 }
 
-char const * stateName(yieldType state) {
-  switch (state) {
-    case noYield: return "noYield";
-    case explicitYield: return "explicitYield";
-    case forcedYield: return "forcedYield";
-  }
-  return "unkown"; // should be unreachable
-}
-
-void switchState(yieldType old, yieldType new) {
-  debug(3, "switching state from %s to %s\n", stateName(old), stateName(new));
-  if (state != old) error(unexpectedState);
-  if (old == new) error(stateUnchanged);
-  if (old == forcedYield && new == explicitYield) error(forcedExplicitTransition);
-  if (old == explicitYield && new == forcedYield) error(explicitForcedTransition);
-  state = new;
-}
-
 static void printState(char const *message, pthread_t thread) {
-  debug(2, "'%s' %s state boosted=%d, pendingPreemption=%d, %s\n",
-        getName(thread), message, boosted(thread), pendingPreemption, stateName(state));
+  debug(2, "'%s' %s state boosted=%d, %s\n",
+        getName(thread), message, boosted(thread), currentState());
 }
 
 static bool isFromOrTo(pthread_t thread) { return (isFrom(thread) || isTo(thread)); }
@@ -57,17 +44,16 @@ static int preempt_hook(unsigned __attribute__((unused)) cpu,
                         pthread_t currentThread,
                         pthread_t nextThread) {
   if (isFromOrTo(currentThread)) {
-    if (state == explicitYield) {
+    if (inExplicitYield() || inForcedYield()) {
       debug(2, "kernel saw intentional yield to '%s'\n", getName(nextThread));
-    } else if (!Temporarily_Block_Preemption && state == forcedYield) {
-      debug(2, "kernel saw yield to '%s'\n", getName(nextThread));
-    } else {
-      if (Temporarily_Block_Preemption) debug(1, "kernel wants to pre-empt '%s'\n", getName(currentThread));
-      else debug(1, "kernel pre-empts '%s'\n", getName(currentThread));
+    } else if(Temporarily_Block_Preemption && (inExplicitYield() || notCurrentlyYielding())) {
+      debug(1, "kernel wants to pre-empt '%s'\n", getName(currentThread));
       log(preemptRequest);
-      pendingPreemption = true;
-      printState("pre-emption with", currentThread);
-      return !Temporarily_Block_Preemption; // block pre-emption
+      if (inExplicitYield()) setPreemptedInYield();
+      else if (notCurrentlyYielding()) setPendingPreemption();
+      else error(unexpectedState);
+      printState("kernel pre-emption with", currentThread);
+      return false; // block pre-emption
     }
   } else debug(2, "kernel switches from '%s' to '%s'\n", getName(currentThread), getName(nextThread));
   return true; // allow pre-emption
@@ -88,29 +74,35 @@ static pthread_t next() {
 }
 
 // These functions are only usable directly after a return
-static bool otherThreadYieldedBackToUs() { return state == explicitYield && boosted(pthread_self()); }
+static bool otherThreadYieldedBackToUs() { return inExplicitYield() && boosted(pthread_self()); }
 static bool otherThreadWasPreempted() {
-  return !Temporarily_Block_Preemption && state == forcedYield && !boosted(pthread_self());
+  return !Temporarily_Block_Preemption && inForcedYield() && !boosted(pthread_self());
 }
 static bool otherThreadIsFinished() { return toIsFinished(); }
-static bool preemptionWhileYielding() { return state == explicitYield && pendingPreemption; }
 
 static volatile yieldType * incomingYieldFlagForSelf() ;
 
 // This function always yields. It will yield with “yielding” set to true.
 static void wrapYield(void (*yieldFunc)(pthread_t), pthread_t thread) {
-  switchState(noYield, explicitYield);
+  if (notCurrentlyYielding())
+    setExplicitYield();
+  else if (isPreemptionPending())
+    setPreemptedInYield();
 
   printState("yield in", pthread_self());
-  yieldFunc(thread); // go through one yieldTo/yieldBack cycle. This should be the only return point!
-  if (pendingPreemption) {
+  if (yieldWasPreempted()) {
+    yieldFunc(thread);
     debug(1, "pre-emption while yielding, all good\n");
-    pendingPreemption = false;
-    __revert_sched_boost(pthread_self()); // should not yield
+    setPreemptionRequestHandled();
+    __revert_sched_boost(pthread_self());
+  } else {
+    yieldFunc(thread);
   }
   printState("returned in", pthread_self());
 
-  if (otherThreadWasPreempted()) {
+  if (inForcedYield()) {
+    debug(1, "'%s' was forced to yield in syncpoint.\n", getName(thread));
+  } else if (otherThreadWasPreempted()) {
     debug(1, "'%s' was preempted. yielding back to it to run into a syncpoint.\n", getName(thread));
     yieldFunc(thread);
     if(!incomingYieldFlagForSelf() == forcedYield) error(notInSyncpoint);
@@ -119,7 +111,7 @@ static void wrapYield(void (*yieldFunc)(pthread_t), pthread_t thread) {
     debug(1, "'%s' returning\n", selfName());
   } else if (otherThreadIsFinished()) { // nothing to do
   } else error(unexpectedReturn);
-  switchState(explicitYield, noYield);
+  setYieldFinished();
   deboost();
 }
 
@@ -128,14 +120,13 @@ static inline void yield(pthread_t thread) {
   if (self == thread) error(yieldToSelf);
   debug(1, "'%s' wants to yield to '%s'\n", selfName(), getName(next()));
   if (!deboosted(pthread_self())) error(mustDeboostSelf);
-  if (state != noYield) error(invalidBoostScenario);
 
   debug(1, "'%s' boosting '%s'\n", selfName(), getName(thread));
   wrapYield(&setBoostPriority, thread); // yields
 }
 
-inline void yieldTo() { yield(getTo()); }
-inline void yieldBack() { yield(getFrom()); }
+inline void yieldTo() { syncPoint(); yield(getTo()); }
+inline void yieldBack() { syncPoint(); yield(getFrom()); }
 
 static volatile yieldType * incomingYieldFlagForSelf() {
   return (isTo(pthread_self()) ? &fromState->incomingYield : &toState->incomingYield);
@@ -147,10 +138,10 @@ static void preemptInSyncpoint() {
   if(*incomingYield == forcedYield) error(alreadyInSyncpoint);
   *incomingYield = forcedYield;
   debug(1, "forced yield in '%s'\n", selfName());
+  setForcedYield();
   debug(2, "non-yielding boost\n");
   setBoostPriority(next());
-  debug(1, "'%s' re-allows pre-emption\n", selfName());
-  pendingPreemption = false;
+  debug(1, "'%s' wants to re-allow pre-emption\n", selfName());
   wrapYield(&__revert_sched_boost, pthread_self());
   debug(1, "'%s' returning in syncpoint\n", selfName());
   *incomingYield = noYield;
@@ -158,11 +149,11 @@ static void preemptInSyncpoint() {
 
 static bool firstYieldTo=true;
 inline void syncPoint() {
-  if (state == explicitYield && firstYieldTo) { // Todo: only really needed for first yieldTo, not in the greatest spot here
+  if (inExplicitYield() && firstYieldTo) { // Todo: only really needed for first yieldTo, not in the greatest spot here
     firstYieldTo=false;
     debug(2, "handling first yieldTo\n");
-    switchState(explicitYield, noYield);
+    setYieldFinished();
     deboost();
   }
-  if (pendingPreemption) preemptInSyncpoint();
+  if (isPreemptionPending()) preemptInSyncpoint();
 }

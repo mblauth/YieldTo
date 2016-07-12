@@ -23,7 +23,7 @@ if(PIKEOS)
   link_directories(SYSTEM ${CMAKE_FIND_ROOT_PATH}/target/ppc/e500/lib
                    SYSTEM ${CMAKE_FIND_ROOT_PATH}/target/ppc/e500/bposix/os/up)
   set(BarrierImplementation polling-barrier.c) # not so POSIX…
-  set(YieldToImplementation yieldTo-PikeOS.c) # boost-posix.c is also supported
+  set(YieldToImplementation yieldTo-PikeOS.c pikeos-state.c) # boost-posix.c is also supported
   set(LogImplementation pikeos-benchmarklog.c)
   add_definitions(-DHAVE_PREEMPTION_HOOK)
 elseif(QNX)

@@ -34,8 +34,8 @@ bool isTo(pthread_t thread) { return thread == to; }
 pthread_t getTo() { return to; }
 
 char const * getName(pthread_t thread) {
-  if (thread == to) return "to";
-  if (thread == from) return "from";
+  if (isTo(thread)) return "to";
+  if (isFrom(thread)) return "from";
   return "unknown";
 }
 

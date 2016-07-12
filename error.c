@@ -61,6 +61,8 @@ static char* errorStringFor(enum errorcode code) {
       return "direct transition from forced to explicit yield";
     case explicitForcedTransition:
       return "direct transition from explicit to forced yield";
+    case yieldFailed:
+      return "yield failed";
   }
   return "unknown error"; // should be unreachable
 }
