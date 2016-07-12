@@ -11,7 +11,7 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
 if(PIKEOS)
   add_definitions(-DPIKEOS_POSIX_PSE52)
   add_definitions(-DPIKEOS_POSIX_SCHEDULER_HOOK=true) # Note that this requires a custom build of the PikeOS toolchain
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-builtin -fno-unit-at-a-time -nostdinc -fno-strict-aliasing -msoft-float -O0")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-builtin -fno-unit-at-a-time -nostdinc -fno-strict-aliasing -msoft-float -O3")
   set(CMAKE_FIND_ROOT_PATH "${PIKEOS_ROOT}")
   set(POSIXLIBS ${CMAKE_FIND_ROOT_PATH}/target/ppc/e500/bposix/lib/)
   set(CMAKE_C_COMPILER ${CMAKE_FIND_ROOT_PATH}/cdk/ppc/e500/bin/ppc_e500-gcc)

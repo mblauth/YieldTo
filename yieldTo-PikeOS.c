@@ -108,7 +108,7 @@ static void wrapYield(void (*yieldFunc)(pthread_t), pthread_t thread) {
     setPreemptionRequestHandled();
     __revert_sched_boost(pthread_self());
   } else {
-    debug(1, "yielding now!\n");
+    debug(2, "yielding now!\n");
     yieldFunc(thread);
   }
   printState("returned in", pthread_self());

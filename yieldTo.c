@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdbool.h>
+#include <unistd.h>
 
 #include "yieldTo.h"
 #include "barrier.h"
@@ -45,6 +46,9 @@ static void *toLogic(void *  __attribute__((unused)) ignored) {
     runLoop(toState);
     checkedYieldTo(toState, fromState);
   }
+  if (Yield_Count == 0) {
+    runLoop(toState);
+  }
   toFinished = true;
   status("yieldTo target finished execution");
   return NULL;
@@ -66,6 +70,8 @@ static void shutdown() {
 }
 
 static void startup() {
+  status("sleeping for a second");
+  sleep(1);
   status("launching yieldTo test");
   createFromState();
   createToState();
