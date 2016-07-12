@@ -5,7 +5,6 @@
 #include <sys/sched_hook.h>
 #include <stdbool.h>
 #include <pthread.h>
-#include <stdio.h>
 
 #include "yieldTo.h"
 #include "error.h"
@@ -46,14 +45,19 @@ static int preempt_hook(unsigned __attribute__((unused)) cpu,
   if (isFromOrTo(currentThread)) {
     if (inExplicitYield() || inForcedYield()) {
       debug(2, "kernel saw intentional yield to '%s'\n", getName(nextThread));
-    } else if(Temporarily_Block_Preemption && (inExplicitYield() || notCurrentlyYielding())) {
+    } else if(inExplicitYield() || notCurrentlyYielding()) {
       debug(1, "kernel wants to pre-empt '%s'\n", getName(currentThread));
       log(preemptRequest);
       if (inExplicitYield()) setPreemptedInYield();
-      else if (notCurrentlyYielding()) setPendingPreemption();
+      else if (notCurrentlyYielding())
+#if Temporarily_Block_Preemption
+      setPendingPreemption();
+#else
+      setPreempted();
+#endif
       else error(unexpectedState);
       printState("kernel pre-emption with", currentThread);
-      return false; // block pre-emption
+      return !Temporarily_Block_Preemption; // block pre-emption
     }
   } else debug(2, "kernel switches from '%s' to '%s'\n", getName(currentThread), getName(nextThread));
   return true; // allow pre-emption
@@ -76,7 +80,11 @@ static pthread_t next() {
 // These functions are only usable directly after a return
 static bool otherThreadYieldedBackToUs() { return inExplicitYield() && boosted(pthread_self()); }
 static bool otherThreadWasPreempted() {
-  return !Temporarily_Block_Preemption && inForcedYield() && !boosted(pthread_self());
+#if !Temporarily_Block_Preemption
+  return wasPreempted();
+#else
+  return false;
+#endif
 }
 static bool otherThreadIsFinished() { return toIsFinished(); }
 
@@ -86,7 +94,11 @@ static volatile yieldType * incomingYieldFlagForSelf() ;
 static void wrapYield(void (*yieldFunc)(pthread_t), pthread_t thread) {
   if (notCurrentlyYielding())
     setExplicitYield();
+#if Temporarily_Block_Preemption
   else if (isPreemptionPending())
+#else
+  else if (wasPreempted())
+#endif
     setPreemptedInYield();
 
   printState("yield in", pthread_self());
@@ -96,6 +108,7 @@ static void wrapYield(void (*yieldFunc)(pthread_t), pthread_t thread) {
     setPreemptionRequestHandled();
     __revert_sched_boost(pthread_self());
   } else {
+    debug(1, "yielding now!\n");
     yieldFunc(thread);
   }
   printState("returned in", pthread_self());
@@ -104,9 +117,11 @@ static void wrapYield(void (*yieldFunc)(pthread_t), pthread_t thread) {
     debug(1, "'%s' was forced to yield in syncpoint.\n", getName(thread));
   } else if (otherThreadWasPreempted()) {
     debug(1, "'%s' was preempted. yielding back to it to run into a syncpoint.\n", getName(thread));
+    if (!deboosted(pthread_self())) deboost();
     yieldFunc(thread);
     if(!incomingYieldFlagForSelf() == forcedYield) error(notInSyncpoint);
     debug(1, "'%s' returning (with '%s' in syncpoint)\n", selfName(), getName(thread));
+    printState("returned in", pthread_self());
   } else if (otherThreadYieldedBackToUs()) {
     debug(1, "'%s' returning\n", selfName());
   } else if (otherThreadIsFinished()) { // nothing to do
@@ -139,10 +154,16 @@ static void preemptInSyncpoint() {
   *incomingYield = forcedYield;
   debug(1, "forced yield in '%s'\n", selfName());
   setForcedYield();
-  debug(2, "non-yielding boost\n");
-  setBoostPriority(next());
-  debug(1, "'%s' wants to re-allow pre-emption\n", selfName());
-  wrapYield(&__revert_sched_boost, pthread_self());
+  if (Temporarily_Block_Preemption) {
+    debug(2, "non-yielding boost\n");
+    setBoostPriority(next());
+    debug(1, "'%s' wants to re-allow pre-emption\n", selfName());
+    wrapYield(&__revert_sched_boost, pthread_self());
+  } else {
+    debug(1, "'%s' boosting '%s'\n", selfName(), getName(next()));
+    if (!deboosted(pthread_self())) deboost();
+    wrapYield(&setBoostPriority, next());
+  }
   debug(1, "'%s' returning in syncpoint\n", selfName());
   *incomingYield = noYield;
 }
@@ -155,5 +176,10 @@ inline void syncPoint() {
     setYieldFinished();
     deboost();
   }
-  if (isPreemptionPending()) preemptInSyncpoint();
+#if Temporarily_Block_Preemption
+  if (isPreemptionPending())
+#else
+  if (wasPreempted())
+#endif
+    preemptInSyncpoint();
 }
