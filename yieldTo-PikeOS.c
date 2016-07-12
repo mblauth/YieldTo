@@ -14,12 +14,6 @@
 #include "statehandling.h"
 #include "pikeos-state.h"
 
-
-/*
- * Intentional Yielding: T1(noYield, explicitYield) -y-> T2(explicitYield, noYield)
- * Preemption: T1 -> K(noYield, pendingPreemption) -> T1(pendingPreemption, explicitYield) -y-> T2(explicitYield, noYield)
- */
-
 void marker(){} // not implemented
 void setFromId() { registerFrom(pthread_self()); }
 void setToId() { registerTo(pthread_self()); }
