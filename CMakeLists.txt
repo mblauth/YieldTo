@@ -57,8 +57,8 @@ endif()
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99") # PikeOS toolchain does not support c11
 add_definitions(-D_GNU_SOURCE)
 
-add_executable(YieldTo yieldTo.c error.c statehandling.c threadmanagement.c posix-scheduling.c ${LogImplementation}
-                       ${BarrierImplementation} ${YieldToImplementation} ${SingleCoreOnlyImplementation})
+add_executable(YieldTo yieldTo.c error.c histogram.c statehandling.c threadmanagement.c posix-scheduling.c
+               ${LogImplementation} ${BarrierImplementation} ${YieldToImplementation} ${SingleCoreOnlyImplementation})
 
 if(PIKEOS)
   set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -T${CMAKE_FIND_ROOT_PATH}/target/ppc/e500/scripts/app-ld-script \

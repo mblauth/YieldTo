@@ -3,12 +3,11 @@
 #include <stdio.h>
 #include <ddapi/ddapi.h>
 
+#include "histogram.h"
 #include "log.h"
 
-static volatile uint64_t minTimeMus = LONG_MAX;
-static volatile uint64_t maxTimeMus = 0;
-
 static volatile uint64_t startTimeMus;
+static volatile int calibrationRuns = 100;
 
 static uint64_t getTimeInMus() { return (dd_get_time_raw() / 1000); }
 
@@ -19,8 +18,9 @@ static void handlePreemptRequest() {
 static void handlePreemptionEvent() {
   uint64_t endTimeMus = getTimeInMus();
   uint64_t musDiff = endTimeMus - startTimeMus;
-  if (minTimeMus > musDiff) minTimeMus = musDiff;
-  if (maxTimeMus < musDiff) maxTimeMus = musDiff;
+
+  if (calibrationRuns-- > 0) calibrate(musDiff);
+  else logValue(musDiff);
 }
 
 void log(enum logEvent event) {
@@ -31,9 +31,7 @@ void log(enum logEvent event) {
     case toPreemptionEvent:
       return handlePreemptionEvent();
     case toLoopFinishedEvent:
-      printf("Max: %llu, Min: %llu\n", maxTimeMus, minTimeMus);
-      maxTimeMus = 0;
-      minTimeMus = UINT64_MAX;
+      printHistogram();
       return;
     default: ; // ignore other events
   }

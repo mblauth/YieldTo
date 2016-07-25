@@ -63,6 +63,8 @@ static char* errorStringFor(enum errorcode code) {
       return "direct transition from explicit to forced yield";
     case yieldFailed:
       return "yield failed";
+    case alreadyCalibrated:
+      return "histogram already calibrated";
   }
   return "unknown error"; // should be unreachable
 }
