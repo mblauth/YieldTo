@@ -10,6 +10,7 @@
 #include "scheduling.h"
 #include "threadmanagement.h"
 #include "statehandling.h"
+#include "histogram.h"
 
 static volatile bool toFinished = false;
 static volatile bool started = false;
@@ -50,6 +51,7 @@ static void *toLogic(void *  __attribute__((unused)) ignored) {
     runLoop(toState);
   }
   toFinished = true;
+  printHistogram();
   status("yieldTo target finished execution");
   return NULL;
 }

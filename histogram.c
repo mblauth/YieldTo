@@ -4,7 +4,7 @@
 #include "histogram.h"
 #include "error.h"
 
-#define bucketCount 40
+#define bucketCount 10
 
 /* This provides a simple linear histogram */
 
@@ -15,7 +15,12 @@ static volatile bool calibrated = false;
 
 static volatile uint64_t buckets[bucketCount] = {0};
 
+static volatile bool firstValue = true;
 void calibrate(__uint64_t value) {
+  if (firstValue) { // ignore first value
+    firstValue = false;
+    return;
+  }
   if (calibrated) error(alreadyCalibrated);
   if (value < minTime) minTime = value;
   if (value > maxTime) maxTime = value;
@@ -30,12 +35,19 @@ void logValue(uint64_t value) {
     step = (maxTime-minTime)/bucketCount;
     calibrated = true;
   }
-  buckets[bucketFor(value)]++;
+  uint64_t bucket = bucketFor(value);
+  if (bucket < 0) bucket = 0;
+  else if (bucket > 40) bucket = 40;
+  buckets[bucket]++;
 }
 
 void printHistogram() {
   printf("number of buckets: %d\n", bucketCount);
   printf("range per bucket: %llu\n", step);
-  for (int i = 0; i < bucketCount; i++)
-    printf("%llu–%llu: %llu\n", minTime+(i*step), minTime+((i+1)*step), buckets[i]);
+  int total = 0;
+  for (int i = 0; i < bucketCount; i++) {
+    printf("%llu–%llu: %llu\n", minTime + (i * step), minTime + ((i + 1) * step), buckets[i]);
+    total+=buckets[i];
+  }
+  printf("%d total measurements taken\n", total);
 }

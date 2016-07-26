@@ -7,7 +7,7 @@
 #include "log.h"
 
 static volatile uint64_t startTimeMus;
-static volatile int calibrationRuns = 100;
+static volatile int calibrationRuns = 10;
 
 static uint64_t getTimeInMus() { return (dd_get_time_raw() / 1000); }
 
@@ -30,9 +30,6 @@ void log(enum logEvent event) {
     case fromPreemptionEvent:
     case toPreemptionEvent:
       return handlePreemptionEvent();
-    case toLoopFinishedEvent:
-      printHistogram();
-      return;
     default: ; // ignore other events
   }
 }
